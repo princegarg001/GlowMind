@@ -1,4 +1,5 @@
 import 'package:glowmind/pages/home/glow_home_page.dart';
+import 'package:glowmind/pages/music/vertical_mood_navigator.dart';
 //import 'package:glowmind/pages/notes/notes_page.dart';
 import 'package:glowmind/pages/sleep/sleep_page.dart';
 import 'package:glowmind/pages/settings_page.dart';
@@ -27,6 +28,12 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.home,
         name: 'home',
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: VerticalMoodNavigator()),
+      ),
+      GoRoute(
+        path: AppRoutes.originalHome,
+        name: 'original_home',
         pageBuilder: (context, state) =>
             const NoTransitionPage(child: GlowHomePage()),
       ),
@@ -57,6 +64,7 @@ class AppRoutes {
   static const String splash = '/';
   static const String auth = '/auth';
   static const String home = '/home';
+  static const String originalHome = '/original-home';
   static const String notes = '/notes';
   static const String sleep = '/sleep';
   static const String insights = '/insights'; // NEW
