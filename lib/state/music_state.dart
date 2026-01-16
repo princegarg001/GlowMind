@@ -242,11 +242,12 @@ class MusicState extends ChangeNotifier {
     _volume = volume;
     await _audioService.setVolume(volume);
     
-    // Save to preferences
+    // Save to preferences (fire and forget)
     if (_userId != null && _preferences != null) {
       _preferences = _preferences!.copyWith(volume: volume);
       await _storage.saveLocalPreferences(_preferences!);
-      _storage.saveSupabasePreferences(_preferences!);
+      // Async save to Supabase (don't await, use unawaited pattern)
+      unawaited(_storage.saveSupabasePreferences(_preferences!));
     }
     
     notifyListeners();
@@ -257,11 +258,12 @@ class MusicState extends ChangeNotifier {
     _shuffle = !_shuffle;
     _audioService.setShuffle(_shuffle);
     
-    // Save to preferences
+    // Save to preferences (fire and forget)
     if (_userId != null && _preferences != null) {
       _preferences = _preferences!.copyWith(shuffle: _shuffle);
       _storage.saveLocalPreferences(_preferences!);
-      _storage.saveSupabasePreferences(_preferences!);
+      // Async save to Supabase (don't await, use unawaited pattern)
+      unawaited(_storage.saveSupabasePreferences(_preferences!));
     }
     
     notifyListeners();
@@ -272,11 +274,12 @@ class MusicState extends ChangeNotifier {
     _audioService.cycleLoopMode();
     _loopMode = _audioService.loopMode;
     
-    // Save to preferences
+    // Save to preferences (fire and forget)
     if (_userId != null && _preferences != null) {
       _preferences = _preferences!.copyWith(loopMode: _loopMode);
       _storage.saveLocalPreferences(_preferences!);
-      _storage.saveSupabasePreferences(_preferences!);
+      // Async save to Supabase (don't await, use unawaited pattern)
+      unawaited(_storage.saveSupabasePreferences(_preferences!));
     }
     
     notifyListeners();

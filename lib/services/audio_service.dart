@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:glowmind/models/music_models.dart';
+import 'package:rxdart/rxdart.dart';
 
 /// Service for audio playback, playlist management, and sleep timer
 class AudioService {
@@ -285,7 +286,7 @@ class AudioService {
 
     // Schedule timer to fade out and stop
     final fadeStartDuration = duration - const Duration(seconds: 30);
-    if (fadeStartDuration.isNegative) {
+    if (fadeStartDuration.isNegative || fadeStartDuration.inMilliseconds < 100) {
       // If duration is less than 30 seconds, start fading immediately
       _startFadeOut(duration);
     } else {
@@ -296,7 +297,7 @@ class AudioService {
     }
 
     // Schedule final stop
-    Timer(duration, () async {
+    _sleepTimerSubscription = Stream.periodic(Duration.zero).take(1).delay(duration).listen((_) async {
       await stop();
       cancelSleepTimer();
     });
@@ -306,16 +307,19 @@ class AudioService {
   void _startFadeOut(Duration duration) {
     final initialVolume = _player.volume;
     final steps = 30; // Fade in 30 steps
-    final stepDuration = duration.inMilliseconds ~/ steps;
+    // Ensure stepDuration is at least 100ms to prevent division by zero
+    final stepDuration = (duration.inMilliseconds ~/ steps).clamp(100, 10000);
     var currentStep = 0;
 
-    Timer.periodic(Duration(milliseconds: stepDuration), (timer) {
+    _fadeOutTimer?.cancel();
+    _fadeOutTimer = Timer.periodic(Duration(milliseconds: stepDuration), (timer) {
       currentStep++;
       final newVolume = initialVolume * (1 - currentStep / steps);
       _player.setVolume(newVolume.clamp(0.0, 1.0));
 
       if (currentStep >= steps) {
         timer.cancel();
+        _fadeOutTimer = null;
       }
     });
   }
