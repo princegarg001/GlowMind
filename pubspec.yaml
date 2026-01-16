@@ -17,6 +17,9 @@ dependencies:
   go_router: ^16.2.0
   provider: ^6.1.2
   supabase_flutter: '>=1.10.0'
+  just_audio: ^0.9.36
+  audio_session: ^0.1.18
+  rxdart: ^0.27.7
 
 dev_dependencies:
   flutter_test:
@@ -26,6 +29,13 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/audio/sleep/
+    - assets/audio/study/
+    - assets/audio/party/
+    - assets/audio/meditate/
+    - assets/audio/focus/
+    - assets/audio/nature/
 
 flutter_launcher_icons:
   android: true

@@ -4,14 +4,20 @@ import 'package:glowmind/models/models.dart';
 import 'package:glowmind/services/glow_engine.dart';
 import 'package:glowmind/services/supabase_service.dart';
 import 'package:glowmind/supabase/supabase_config.dart';
+import 'package:glowmind/state/music_state.dart';
 
 class AppState extends ChangeNotifier {
-  AppState({required SupabaseDataService dataService, required GlowEngine glowEngine})
-      : _dataService = dataService,
-        _glowEngine = glowEngine;
+  AppState({
+    required SupabaseDataService dataService,
+    required GlowEngine glowEngine,
+    MusicState? musicState,
+  })  : _dataService = dataService,
+        _glowEngine = glowEngine,
+        _musicState = musicState;
 
   final SupabaseDataService _dataService;
   final GlowEngine _glowEngine;
+  final MusicState? _musicState;
   StreamSubscription? _authSubscription;
 
   AuthStatus _authStatus = AuthStatus.signedOut;
@@ -27,6 +33,7 @@ class AppState extends ChangeNotifier {
   SleepProfile? get sleep => _sleep;
   GlowState get glow => _glow;
   bool get isLoading => _isLoading;
+  MusicState? get musicState => _musicState;
 
   Future<void> init() async {
     _authSubscription = SupabaseConfig.auth.onAuthStateChange.listen((data) {
@@ -54,6 +61,10 @@ class AppState extends ChangeNotifier {
       
       if (_user != null) {
         await loadUserData();
+        // Initialize music state for user
+        if (_musicState != null) {
+          await _musicState!.initForUser(_user!.id);
+        }
       }
     } catch (e) {
       debugPrint('Auth change error: $e');
