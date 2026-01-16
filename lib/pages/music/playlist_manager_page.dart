@@ -1,0 +1,385 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:glowmind/models/music_models.dart';
+import 'package:glowmind/state/music_state.dart';
+
+/// Playlist manager page accessible via right swipe from mood pages
+class PlaylistManagerPage extends StatefulWidget {
+  const PlaylistManagerPage({super.key});
+
+  @override
+  State<PlaylistManagerPage> createState() => _PlaylistManagerPageState();
+}
+
+class _PlaylistManagerPageState extends State<PlaylistManagerPage>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF1A0F3D),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          'Playlists',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Theme.of(context).colorScheme.primary,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white60,
+          tabs: const [
+            Tab(text: 'Now Playing'),
+            Tab(text: 'All Playlists'),
+            Tab(text: 'Surprise Me'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: const [
+          _NowPlayingTab(),
+          _AllPlaylistsTab(),
+          _SurpriseMeTab(),
+        ],
+      ),
+    );
+  }
+}
+
+/// Now Playing tab - shows current queue
+class _NowPlayingTab extends StatelessWidget {
+  const _NowPlayingTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final musicState = context.watch<MusicState>();
+    final playlist = musicState.currentPlaylist;
+    final currentTrack = musicState.currentTrack;
+
+    if (playlist == null || playlist.tracks.isEmpty) {
+      return const Center(
+        child: Text(
+          'No playlist loaded',
+          style: TextStyle(color: Colors.white60, fontSize: 16),
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Current playlist info
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                playlist.name,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${playlist.tracks.length} tracks',
+                style: const TextStyle(
+                  color: Colors.white60,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Track list
+        ...playlist.tracks.asMap().entries.map((entry) {
+          final index = entry.key;
+          final track = entry.value;
+          final isCurrent = track.id == currentTrack?.id;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: isCurrent
+                  ? Theme.of(context).colorScheme.primary.withOpacity(0.2)
+                  : Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: ListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isCurrent
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.white.withOpacity(0.1),
+                ),
+                child: Center(
+                  child: isCurrent
+                      ? const Icon(Icons.music_note, color: Colors.white, size: 20)
+                      : Text(
+                          '${index + 1}',
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+              ),
+              title: Text(
+                track.name,
+                style: TextStyle(
+                  color: isCurrent ? Colors.white : Colors.white70,
+                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+              subtitle: track.attribution != null
+                  ? Text(
+                      track.attribution!,
+                      style: const TextStyle(color: Colors.white38, fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    )
+                  : null,
+              trailing: isCurrent
+                  ? const Icon(Icons.equalizer, color: Colors.white)
+                  : null,
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+/// All Playlists tab - browse and edit playlists
+class _AllPlaylistsTab extends StatelessWidget {
+  const _AllPlaylistsTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final musicState = context.watch<MusicState>();
+    final playlists = musicState.getCurrentMoodPlaylists();
+
+    if (playlists.isEmpty) {
+      return const Center(
+        child: Text(
+          'No playlists available',
+          style: TextStyle(color: Colors.white60, fontSize: 16),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: playlists.length,
+      itemBuilder: (context, index) {
+        final playlist = playlists[index];
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: playlist.isDefault
+                  ? Theme.of(context).colorScheme.primary.withOpacity(0.3)
+                  : Colors.transparent,
+            ),
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(16),
+            leading: Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Theme.of(context).colorScheme.primary,
+                    Theme.of(context).colorScheme.secondary,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.queue_music, color: Colors.white),
+            ),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    playlist.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                if (playlist.isDefault)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'DEFAULT',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '${playlist.tracks.length} tracks',
+                style: const TextStyle(color: Colors.white60, fontSize: 14),
+              ),
+            ),
+            onTap: () {
+              musicState.playPlaylist(playlist);
+              Navigator.pop(context);
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Surprise Me tab - auto-generate playlist
+class _SurpriseMeTab extends StatelessWidget {
+  const _SurpriseMeTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final musicState = context.watch<MusicState>();
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    Theme.of(context).colorScheme.primary,
+                    Theme.of(context).colorScheme.secondary,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                    blurRadius: 30,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.auto_awesome,
+                color: Colors.white,
+                size: 50,
+              ),
+            ),
+            const SizedBox(height: 32),
+            const Text(
+              'Surprise Me!',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Generate a unique playlist based on ${musicState.currentMood.displayName} mood',
+              style: const TextStyle(
+                color: Colors.white60,
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton(
+              onPressed: () {
+                // For now, just play the default playlist
+                final playlists = musicState.getCurrentMoodPlaylists();
+                if (playlists.isNotEmpty) {
+                  musicState.playPlaylist(playlists.first);
+                  Navigator.pop(context);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+              ),
+              child: const Text(
+                'Generate Playlist',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Note: Freesound API integration coming soon',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.4),
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

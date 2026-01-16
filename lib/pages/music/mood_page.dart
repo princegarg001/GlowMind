@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import 'package:glowmind/models/music_models.dart';
 import 'package:glowmind/state/music_state.dart';
 import 'package:glowmind/widgets/mood_orb.dart';
 import 'package:glowmind/widgets/music_controls.dart';
 import 'package:glowmind/widgets/sleep_timer_dialog.dart';
+import 'package:glowmind/nav.dart';
 
 /// Single mood page with animated orb and music controls
 class MoodPage extends StatelessWidget {
@@ -201,7 +203,10 @@ class MoodPage extends StatelessWidget {
                       const SizedBox(height: 8),
                       _buildHint(Icons.arrow_downward, 'Swipe down for previous mood'),
                       const SizedBox(height: 8),
-                      _buildHint(Icons.arrow_forward, 'Swipe right for playlist'),
+                      GestureDetector(
+                        onTap: () => context.push(AppRoutes.playlists),
+                        child: _buildHint(Icons.queue_music, 'Tap here for playlist'),
+                      ),
                     ],
                   ),
                 ),
@@ -224,31 +229,55 @@ class MoodPage extends StatelessWidget {
                     onPressed: onSettings,
                   ),
 
-                  // Sleep timer button
-                  GestureDetector(
-                    onTap: () => _showSleepTimer(context, musicState),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: musicState.sleepTimer != null
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.white.withOpacity(0.2),
-                        boxShadow: musicState.sleepTimer != null
-                            ? [
-                                BoxShadow(
-                                  color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-                                  blurRadius: 12,
-                                ),
-                              ]
-                            : null,
+                  // Center buttons
+                  Row(
+                    children: [
+                      // Playlist button
+                      GestureDetector(
+                        onTap: () => context.push(AppRoutes.playlists),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withOpacity(0.2),
+                          ),
+                          child: const Icon(
+                            Icons.queue_music,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.bedtime,
-                        color: Colors.white,
-                        size: 20,
+
+                      const SizedBox(width: 12),
+
+                      // Sleep timer button
+                      GestureDetector(
+                        onTap: () => _showSleepTimer(context, musicState),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: musicState.sleepTimer != null
+                                ? Theme.of(context).colorScheme.primary
+                                : Colors.white.withOpacity(0.2),
+                            boxShadow: musicState.sleepTimer != null
+                                ? [
+                                    BoxShadow(
+                                      color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                                      blurRadius: 12,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: const Icon(
+                            Icons.bedtime,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
