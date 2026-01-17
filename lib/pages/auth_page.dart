@@ -150,7 +150,17 @@ class _AuthCardState extends State<_AuthCard> {
     setState(() => _isLoading = true);
     try {
       await context.read<AppState>().continueAsGuest();
-      if (mounted) context.go(AppRoutes.home);
+      if (mounted) {
+        context.go(AppRoutes.home);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to continue as guest. Please try again.'),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

@@ -110,10 +110,16 @@ class AppState extends ChangeNotifier {
     _user = const AppUser(id: 'guest', isGuest: true);
     notifyListeners();
     
-    // Initialize music for guest user
+    // Initialize music for guest user (don't block if this fails)
     if (_musicState != null) {
       debugPrint('AppState: Initializing music for guest user');
-      await _musicState!.initForUser('guest');
+      try {
+        await _musicState!.initForUser('guest');
+        debugPrint('AppState: Guest music initialization completed');
+      } catch (e) {
+        debugPrint('AppState: Guest music initialization failed: $e');
+        // Continue without music - it's not critical for guest login
+      }
     }
   }
 
