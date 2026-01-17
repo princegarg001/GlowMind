@@ -62,7 +62,6 @@ class AppRouter {
       ),
     ],
   );
-}
 
   static GlowMood _parseMood(String moodStr) {
     switch (moodStr.toLowerCase()) {

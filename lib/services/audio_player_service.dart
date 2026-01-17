@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:audioplayers/audioplayers.dart';
 
@@ -26,9 +27,11 @@ class AudioPlayerService {
   PlayerState _state = PlayerState.stopped;
   PlaybackMode _mode = PlaybackMode.single;
   List<String> _playlist = [];
+  List<String> _playlistNames = [];
   int _currentIndex = 0;
   String? _currentTrackUrl;
   String? _currentTrackName;
+  final Random _random = Random();
   
   final StreamController<PlayerState> _stateController = StreamController<PlayerState>.broadcast();
   final StreamController<int> _indexController = StreamController<int>.broadcast();
@@ -97,6 +100,7 @@ class AudioPlayerService {
     if (urls.isEmpty || startIndex >= urls.length) return;
     
     _playlist = urls;
+    _playlistNames = names;
     _currentIndex = startIndex;
     await playTrack(urls[startIndex], names[startIndex]);
   }
@@ -124,13 +128,16 @@ class AudioPlayerService {
     if (_playlist.isEmpty) return;
     
     if (_mode == PlaybackMode.shuffle) {
-      _currentIndex = DateTime.now().millisecondsSinceEpoch % _playlist.length;
+      _currentIndex = _random.nextInt(_playlist.length);
     } else {
       _currentIndex = (_currentIndex + 1) % _playlist.length;
     }
     
     _indexController.add(_currentIndex);
-    await playTrack(_playlist[_currentIndex], 'Track ${_currentIndex + 1}');
+    final trackName = _playlistNames.isNotEmpty && _currentIndex < _playlistNames.length
+        ? _playlistNames[_currentIndex]
+        : 'Track ${_currentIndex + 1}';
+    await playTrack(_playlist[_currentIndex], trackName);
   }
 
   /// Play previous track in playlist
@@ -139,7 +146,10 @@ class AudioPlayerService {
     
     _currentIndex = (_currentIndex - 1 + _playlist.length) % _playlist.length;
     _indexController.add(_currentIndex);
-    await playTrack(_playlist[_currentIndex], 'Track ${_currentIndex + 1}');
+    final trackName = _playlistNames.isNotEmpty && _currentIndex < _playlistNames.length
+        ? _playlistNames[_currentIndex]
+        : 'Track ${_currentIndex + 1}';
+    await playTrack(_playlist[_currentIndex], trackName);
   }
 
   /// Set playback mode

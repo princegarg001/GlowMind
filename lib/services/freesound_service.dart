@@ -36,6 +36,10 @@ class FreeSoundTrack {
 class FreeSoundService {
   static FreeSoundService? _instance;
   final Map<String, FreeSoundTrack> _cache = {};
+  
+  // Preview quality preferences (from high to low)
+  static const String _previewHqMp3 = 'preview-hq-mp3';
+  static const String _previewLqMp3 = 'preview-lq-mp3';
 
   FreeSoundService._();
 
@@ -66,7 +70,19 @@ class FreeSoundService {
 
       if (response.status == 200 && response.data != null) {
         final data = response.data as Map<String, dynamic>;
-        final track = FreeSoundTrack.fromJson(data);
+        // Use quality constants for preview URL selection
+        final previews = data['previews'] as Map<String, dynamic>?;
+        final previewUrl = previews?[_previewHqMp3] as String? ?? 
+                          previews?[_previewLqMp3] as String? ?? '';
+        
+        final track = FreeSoundTrack(
+          id: data['id']?.toString() ?? '',
+          name: data['name'] as String? ?? 'Unknown',
+          previewUrl: previewUrl,
+          duration: (data['duration'] as num?)?.toInt() ?? 0,
+          description: data['description'] as String? ?? '',
+          tags: (data['tags'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+        );
         
         // Cache the result
         _cache[soundId] = track;

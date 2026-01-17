@@ -98,10 +98,23 @@ class _PlaylistPageState extends State<PlaylistPage> {
     }
   }
 
-  String _formatDuration(int seconds) {
-    final minutes = seconds ~/ 60;
-    final secs = seconds % 60;
-    return '$minutes:${secs.toString().padLeft(2, '0')}';
+  String _formatDuration(dynamic duration) {
+    final int minutes;
+    final int seconds;
+    
+    if (duration is int) {
+      // Duration in seconds (from playlist metadata)
+      minutes = duration ~/ 60;
+      seconds = duration % 60;
+    } else if (duration is Duration) {
+      // Duration object (from audio player)
+      minutes = duration.inMinutes;
+      seconds = duration.inSeconds % 60;
+    } else {
+      return '0:00';
+    }
+    
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
   Color _getMoodColor() {
@@ -395,7 +408,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
                       builder: (context, snapshot) {
                         final position = snapshot.data ?? Duration.zero;
                         return Text(
-                          _formatDurationObject(position),
+                          _formatDuration(position),
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Colors.white60,
                           ),
@@ -531,12 +544,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
       case PlaybackMode.shuffle:
         return 'Shuffle';
     }
-  }
-
-  String _formatDurationObject(Duration duration) {
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
   @override
