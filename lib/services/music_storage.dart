@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:glowmind/models/music_models.dart';
 import 'package:glowmind/supabase/supabase_config.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Service for persisting music state locally and syncing with Supabase
 class MusicStorage {
@@ -109,40 +109,62 @@ class MusicStorage {
     }
   }
 
-  /// Load playlists for a specific mood from Supabase (with local fallback)
+  /// Load playlists for a specific mood from Supabase (with fallback chain)
+  /// Priority: 1. User playlists → 2. Global defaults → 3. Local hardcoded
   Future<List<Playlist>> loadPlaylists(String userId, MoodType mood) async {
     try {
       debugPrint('MusicStorage: Loading playlists for mood: ${mood.name}');
       
-      final data = await SupabaseService.select(
-        'playlists',
-        filters: {'user_id': userId, 'mood': mood.name},
-        orderBy: 'created_at',
-        ascending: false,
-      );
-
-      if (data.isEmpty) {
-        debugPrint('MusicStorage: No playlists in Supabase, using local default');
-        return _getLocalDefaultPlaylist(userId, mood);
+      // 1. Try to load user's playlists
+      List<Map<String, dynamic>> data = [];
+      try {
+        data = await SupabaseService.select(
+          'playlists',
+          filters: {'user_id': userId, 'mood': mood.name},
+          orderBy: 'created_at',
+          ascending: false,
+        );
+      } catch (e) {
+        debugPrint('MusicStorage: User playlists query failed: $e');
       }
 
-      final playlists = <Playlist>[];
-      for (final item in data) {
-        final playlist = Playlist.fromJson(item);
-        if (playlist != null) {
-          // Load tracks for this playlist
-          final tracks = await loadPlaylistTracks(playlist.id);
-          playlists.add(playlist.copyWith(tracks: tracks));
+      // 2. If no user playlists, try global defaults
+      if (data.isEmpty) {
+        debugPrint('MusicStorage: No user playlists, trying global defaults');
+        try {
+          data = await SupabaseService.select(
+            'playlists',
+            filters: {'user_id': 'global', 'mood': mood.name},
+            orderBy: 'created_at',
+            ascending: false,
+          );
+        } catch (e) {
+          debugPrint('MusicStorage: Global playlists query failed: $e');
         }
       }
 
-      if (playlists.isEmpty || playlists.every((p) => p.tracks.isEmpty)) {
-        debugPrint('MusicStorage: Empty playlists from Supabase, using local default');
-        return _getLocalDefaultPlaylist(userId, mood);
+      // 3. Parse and load tracks for found playlists
+      if (data.isNotEmpty) {
+        final playlists = <Playlist>[];
+        for (final item in data) {
+          final playlist = Playlist.fromJson(item);
+          if (playlist != null) {
+            final tracks = await loadPlaylistTracks(playlist.id);
+            if (tracks.isNotEmpty) {
+              playlists.add(playlist.copyWith(tracks: tracks));
+            }
+          }
+        }
+        
+        if (playlists.isNotEmpty) {
+          debugPrint('MusicStorage: Loaded ${playlists.length} playlists from Supabase');
+          return playlists;
+        }
       }
 
-      debugPrint('MusicStorage: Loaded ${playlists.length} playlists from Supabase');
-      return playlists;
+      // 4. Fall back to local defaults
+      debugPrint('MusicStorage: Using local default playlist');
+      return _getLocalDefaultPlaylist(userId, mood);
     } catch (e) {
       debugPrint('MusicStorage: loadPlaylists error: $e - falling back to local');
       return _getLocalDefaultPlaylist(userId, mood);
@@ -295,132 +317,132 @@ class MusicStorage {
     }
   }
 
-  /// Get default tracks for a mood
+  /// Get default tracks for a mood (using CORS-friendly Pixabay URLs)
   List<Track> _getDefaultTracks(MoodType mood) {
     switch (mood) {
       case MoodType.sleep:
         return [
-          Track(
+          const Track(
             id: 'sleep_1',
-            name: 'Rain on Leaves',
-            url: 'https://freesound.org/data/previews/346/346700_5121236-lq.mp3',
+            name: 'Peaceful Rain',
+            url: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3',
             source: 'url',
           ),
-          Track(
+          const Track(
             id: 'sleep_2',
-            name: 'Soft Piano Lullaby',
-            url: 'https://freesound.org/data/previews/527/527948_11567680-lq.mp3',
+            name: 'Soft Piano Dreams',
+            url: 'https://cdn.pixabay.com/audio/2022/02/23/audio_ea70ad08e3.mp3',
             source: 'url',
           ),
-          Track(
+          const Track(
             id: 'sleep_3',
-            name: 'Ocean Waves',
-            url: 'https://freesound.org/data/previews/345/345852_5121236-lq.mp3',
+            name: 'Ocean Lullaby',
+            url: 'https://cdn.pixabay.com/audio/2022/06/07/audio_b9bd4170e4.mp3',
             source: 'url',
           ),
         ];
       case MoodType.study:
         return [
-          Track(
+          const Track(
             id: 'study_1',
             name: 'Lo-fi Study Beat',
-            url: 'https://freesound.org/data/previews/513/513413_10393537-lq.mp3',
+            url: 'https://cdn.pixabay.com/audio/2022/10/25/audio_946b0939c5.mp3',
             source: 'url',
           ),
-          Track(
+          const Track(
             id: 'study_2',
             name: 'Focus Ambient',
-            url: 'https://freesound.org/data/previews/198/198175_1015240-lq.mp3',
+            url: 'https://cdn.pixabay.com/audio/2022/03/15/audio_8cb749d484.mp3',
             source: 'url',
           ),
-          Track(
+          const Track(
             id: 'study_3',
-            name: 'Coffee Shop Ambience',
-            url: 'https://freesound.org/data/previews/536/536108_6988053-lq.mp3',
+            name: 'Calm Concentration',
+            url: 'https://cdn.pixabay.com/audio/2023/07/30/audio_e5e5d61a5e.mp3',
             source: 'url',
           ),
         ];
       case MoodType.party:
         return [
-          Track(
+          const Track(
             id: 'party_1',
             name: 'Upbeat Electronic',
-            url: 'https://freesound.org/data/previews/442/442943_5121236-lq.mp3',
+            url: 'https://cdn.pixabay.com/audio/2022/03/10/audio_d89c289308.mp3',
             source: 'url',
           ),
-          Track(
+          const Track(
             id: 'party_2',
-            name: 'Party Vibes',
-            url: 'https://freesound.org/data/previews/491/491495_10393537-lq.mp3',
+            name: 'Dance Energy',
+            url: 'https://cdn.pixabay.com/audio/2022/11/22/audio_3676e5c8e9.mp3',
             source: 'url',
           ),
-          Track(
+          const Track(
             id: 'party_3',
-            name: 'Energetic Dance',
-            url: 'https://freesound.org/data/previews/527/527410_10393537-lq.mp3',
+            name: 'EDM Vibes',
+            url: 'https://cdn.pixabay.com/audio/2023/09/04/audio_de5f4a2c92.mp3',
             source: 'url',
           ),
         ];
       case MoodType.meditate:
         return [
-          Track(
+          const Track(
             id: 'meditate_1',
             name: 'Tibetan Bowls',
-            url: 'https://freesound.org/data/previews/586/586252_1015240-lq.mp3',
+            url: 'https://cdn.pixabay.com/audio/2022/02/07/audio_3c1e8b9e15.mp3',
             source: 'url',
           ),
-          Track(
+          const Track(
             id: 'meditate_2',
-            name: 'Forest Meditation',
-            url: 'https://freesound.org/data/previews/217/217506_2394245-lq.mp3',
+            name: 'Zen Garden',
+            url: 'https://cdn.pixabay.com/audio/2022/01/26/audio_d1718ab41b.mp3',
             source: 'url',
           ),
-          Track(
+          const Track(
             id: 'meditate_3',
-            name: 'Zen Garden',
-            url: 'https://freesound.org/data/previews/237/237223_1015240-lq.mp3',
+            name: 'Deep Breathing',
+            url: 'https://cdn.pixabay.com/audio/2022/03/12/audio_b4f3c4519e.mp3',
             source: 'url',
           ),
         ];
       case MoodType.deepFocus:
         return [
-          Track(
+          const Track(
             id: 'focus_1',
             name: 'Binaural Focus',
-            url: 'https://freesound.org/data/previews/198/198175_1015240-lq.mp3',
+            url: 'https://cdn.pixabay.com/audio/2022/08/23/audio_3b8e68f90d.mp3',
             source: 'url',
           ),
-          Track(
+          const Track(
             id: 'focus_2',
-            name: 'Deep Concentration',
-            url: 'https://freesound.org/data/previews/133/133901_2394245-lq.mp3',
+            name: 'Concentration Mode',
+            url: 'https://cdn.pixabay.com/audio/2022/05/17/audio_407815a5b6.mp3',
             source: 'url',
           ),
-          Track(
+          const Track(
             id: 'focus_3',
-            name: 'White Noise',
-            url: 'https://freesound.org/data/previews/160/160045_2394245-lq.mp3',
+            name: 'Ambient Flow',
+            url: 'https://cdn.pixabay.com/audio/2022/03/24/audio_7a0ba7a7aa.mp3',
             source: 'url',
           ),
         ];
       case MoodType.nature:
         return [
-          Track(
+          const Track(
             id: 'nature_1',
             name: 'Forest Ambience',
-            url: 'https://freesound.org/data/previews/217/217506_2394245-lq.mp3',
+            url: 'https://cdn.pixabay.com/audio/2022/08/04/audio_2dde668d05.mp3',
             source: 'url',
           ),
-          Track(
+          const Track(
             id: 'nature_2',
-            name: 'Ocean Shore',
-            url: 'https://freesound.org/data/previews/48/48412_22510-lq.mp3',
+            name: 'Birds Chirping',
+            url: 'https://cdn.pixabay.com/audio/2021/09/06/audio_0917bff64a.mp3',
             source: 'url',
           ),
-          Track(
+          const Track(
             id: 'nature_3',
-            name: 'Morning Birds',
-            url: 'https://freesound.org/data/previews/135/135125_2394245-lq.mp3',
+            name: 'Waterfall Stream',
+            url: 'https://cdn.pixabay.com/audio/2022/02/17/audio_cc63d1d5ad.mp3',
             source: 'url',
           ),
         ];

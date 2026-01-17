@@ -1,5 +1,4 @@
 import 'dart:math';
-import 'package:flutter/foundation.dart';
 import 'package:glowmind/models/models.dart';
 
 /// Computes the ambient glow state from passive signals

@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:glowmind/theme.dart';
 
 /// 30-second breathing orb with subtle scale and glow animation
 class BreathingOrb extends StatefulWidget {

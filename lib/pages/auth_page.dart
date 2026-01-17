@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:glowmind/nav.dart';
-import 'package:glowmind/theme.dart';
-import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
-import 'package:glowmind/state/app_state.dart';
 import 'package:glowmind/auth/supabase_auth_manager.dart';
+import 'package:glowmind/nav.dart';
+import 'package:glowmind/state/app_state.dart';
+import 'package:glowmind/theme.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 class AuthPage extends StatelessWidget {
   const AuthPage({super.key});
@@ -25,6 +25,7 @@ class AuthPage extends StatelessWidget {
                   Color(0xFF1A0F3D),
                   Color(0xFF05030C),
                 ],
+                stops: [0.0, 0.5, 1.0],
               ),
             ),
           ),

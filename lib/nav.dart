@@ -7,7 +7,6 @@ import 'package:glowmind/pages/settings_page.dart';
 import 'package:glowmind/pages/splash_gate.dart';
 import 'package:glowmind/pages/auth_page.dart';
 import 'package:glowmind/pages/Insights/insightspage.dart'; // NEW
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 class AppRouter {

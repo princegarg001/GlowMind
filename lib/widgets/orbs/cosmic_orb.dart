@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:glowmind/widgets/orbs/base_orb.dart';
 
@@ -198,6 +199,7 @@ class _CosmicOrbState extends State<CosmicOrb> with TickerProviderStateMixin {
                         const Color(0xFF22D3EE).withValues(alpha: 0.2 + pulse * 0.1),
                         Colors.transparent,
                       ],
+                      stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
                     ),
                   ),
                 ),
@@ -217,6 +219,7 @@ class _CosmicOrbState extends State<CosmicOrb> with TickerProviderStateMixin {
                         Colors.cyan.withValues(alpha: 0.15),
                         Colors.transparent,
                       ],
+                      stops: const [0.0, 0.5, 1.0],
                     ),
                   ),
                 ),

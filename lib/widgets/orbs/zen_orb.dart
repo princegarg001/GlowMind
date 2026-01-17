@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:glowmind/widgets/orbs/base_orb.dart';
 
@@ -163,6 +164,7 @@ class _ZenOrbState extends State<ZenOrb> with TickerProviderStateMixin {
                         Colors.white.withValues(alpha: 0.1),
                         Colors.transparent,
                       ],
+                      stops: const [0.0, 0.5, 1.0],
                     ),
                   ),
                 ),

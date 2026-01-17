@@ -1,10 +1,11 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:glowmind/models/models.dart';
 import 'package:glowmind/services/glow_engine.dart';
 import 'package:glowmind/services/supabase_service.dart';
-import 'package:glowmind/supabase/supabase_config.dart';
 import 'package:glowmind/state/music_state.dart';
+import 'package:glowmind/supabase/supabase_config.dart';
 
 class AppState extends ChangeNotifier {
   AppState({
@@ -65,14 +66,20 @@ class AppState extends ChangeNotifier {
       final userId = _user?.id ?? supabaseUser.id;
       
       if (_user != null) {
-        await loadUserData();
+        // Load user data in background (non-blocking)
+        loadUserData().catchError((e) {
+          debugPrint('AppState: loadUserData failed: $e');
+        });
       }
       
-      // Initialize music state for user
+      // Initialize music state for user in background (non-blocking)
       if (_musicState != null) {
         debugPrint('AppState: Initializing music for user: $userId');
-        await _musicState!.initForUser(userId);
-        debugPrint('AppState: Music initialization complete');
+        _musicState.initForUser(userId).then((_) {
+          debugPrint('AppState: Music initialization complete');
+        }).catchError((e) {
+          debugPrint('AppState: Music initialization failed: $e');
+        });
       }
     } catch (e) {
       debugPrint('AppState: Auth change error: $e');
@@ -110,16 +117,14 @@ class AppState extends ChangeNotifier {
     _user = const AppUser(id: 'guest', isGuest: true);
     notifyListeners();
     
-    // Initialize music for guest user (don't block if this fails)
+    // Initialize music for guest user in background (don't wait for it)
     if (_musicState != null) {
       debugPrint('AppState: Initializing music for guest user');
-      try {
-        await _musicState!.initForUser('guest');
+      _musicState.initForUser('guest').then((_) {
         debugPrint('AppState: Guest music initialization completed');
-      } catch (e) {
+      }).catchError((e) {
         debugPrint('AppState: Guest music initialization failed: $e');
-        // Continue without music - it's not critical for guest login
-      }
+      });
     }
   }
 

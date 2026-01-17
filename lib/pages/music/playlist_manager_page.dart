@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:glowmind/models/music_models.dart';
-import 'package:glowmind/state/music_state.dart';
 import 'package:glowmind/services/freesound_service.dart';
 import 'package:glowmind/state/app_state.dart';
-import 'package:glowmind/theme.dart';
+import 'package:glowmind/state/music_state.dart';
+import 'package:provider/provider.dart';
 
 /// Playlist manager page accessible via right swipe from mood pages
 class PlaylistManagerPage extends StatefulWidget {
@@ -299,40 +298,87 @@ class _SurpriseMeTab extends StatefulWidget {
 
 class _SurpriseMeTabState extends State<_SurpriseMeTab> {
   bool _isGenerating = false;
+  bool _isSaving = false;
   String? _error;
+  Playlist? _generatedPlaylist;
 
   Future<void> _generatePlaylist(BuildContext context) async {
     final musicState = context.read<MusicState>();
     final appState = context.read<AppState>();
     final userId = appState.user?.id ?? 'guest';
 
+    if (!mounted) return;
     setState(() {
       _isGenerating = true;
       _error = null;
+      _generatedPlaylist = null;
     });
 
     try {
       final freesound = FreesoundService();
-      final playlist = await freesound.createMoodPlaylist(
-        musicState.currentMood,
+      // Use random playlist generation instead of mood-based
+      final playlist = await freesound.createRandomPlaylist(
         userId,
         trackCount: 10,
       );
 
       if (playlist.tracks.isEmpty) {
-        throw Exception('No sounds found for this mood.');
+        throw Exception('No sounds found. Please try again.');
       }
 
+      if (!mounted) return;
+      setState(() {
+        _generatedPlaylist = playlist;
+      });
+      
       await musicState.playPlaylist(playlist);
-      if (mounted) Navigator.pop(context);
     } catch (e) {
       debugPrint('Error generating playlist: $e');
+      if (!mounted) return;
       setState(() {
-        _error = e.toString().contains('Exception: ') ? e.toString().split('Exception: ')[1] : 'Failed to generate playlist. Please check your connection.';
+        _error = e.toString().contains('Exception: ') 
+            ? e.toString().split('Exception: ')[1] 
+            : 'Failed to generate playlist. Please check your connection.';
       });
     } finally {
       if (mounted) {
         setState(() => _isGenerating = false);
+      }
+    }
+  }
+
+  Future<void> _savePlaylist(BuildContext context) async {
+    if (_generatedPlaylist == null) return;
+    
+    final musicState = context.read<MusicState>();
+    
+    if (!mounted) return;
+    setState(() {
+      _isSaving = true;
+      _error = null;
+    });
+
+    try {
+      await musicState.addPlaylist(_generatedPlaylist!);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved "${_generatedPlaylist!.name}" to your playlists'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      debugPrint('Error saving playlist: $e');
+      if (!mounted) return;
+      setState(() {
+        _error = 'Failed to save playlist. Please try again.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
       }
     }
   }
@@ -377,7 +423,9 @@ class _SurpriseMeTabState extends State<_SurpriseMeTab> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Generate a unique playlist from Freesound based on ${musicState.currentMood.displayName} mood',
+              _generatedPlaylist != null
+                  ? 'Playing "${_generatedPlaylist!.name}" with ${_generatedPlaylist!.tracks.length} tracks'
+                  : 'Generate a unique surprise playlist from Freesound',
               style: const TextStyle(color: Colors.white60, fontSize: 14),
               textAlign: TextAlign.center,
             ),
@@ -390,8 +438,10 @@ class _SurpriseMeTabState extends State<_SurpriseMeTab> {
               ),
             ],
             const SizedBox(height: 32),
+            
+            // Generate button
             ElevatedButton(
-              onPressed: _isGenerating ? null : () => _generatePlaylist(context),
+              onPressed: (_isGenerating || _isSaving) ? null : () => _generatePlaylist(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: scheme.primary,
                 foregroundColor: Colors.white,
@@ -399,10 +449,38 @@ class _SurpriseMeTabState extends State<_SurpriseMeTab> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
               ),
               child: Text(
-                _isGenerating ? 'Generating...' : 'Generate Playlist',
+                _isGenerating 
+                    ? 'Generating...' 
+                    : _generatedPlaylist != null 
+                        ? 'Generate New' 
+                        : 'Generate Playlist',
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
+            
+            // Save button (shown after generation)
+            if (_generatedPlaylist != null) ...[
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: _isSaving ? null : () => _savePlaylist(context),
+                icon: _isSaving 
+                    ? const SizedBox(
+                        width: 16, 
+                        height: 16, 
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.save, color: Colors.white),
+                label: Text(
+                  _isSaving ? 'Saving...' : 'Save to My Playlists',
+                  style: const TextStyle(color: Colors.white),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: scheme.primary),
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                ),
+              ),
+            ],
           ],
         ),
       ),

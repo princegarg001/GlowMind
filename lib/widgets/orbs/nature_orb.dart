@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:glowmind/widgets/orbs/base_orb.dart';
 
@@ -192,6 +193,7 @@ class _NatureOrbState extends State<NatureOrb> with TickerProviderStateMixin {
                         const Color(0xFFA3E635).withValues(alpha: 0.2),
                         Colors.transparent,
                       ],
+                      stops: const [0.0, 0.5, 1.0],
                     ),
                   ),
                 ),

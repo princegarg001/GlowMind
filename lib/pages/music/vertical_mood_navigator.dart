@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
 import 'package:glowmind/models/music_models.dart';
+import 'package:glowmind/nav.dart';
 import 'package:glowmind/state/music_state.dart';
+import 'package:glowmind/widgets/interactive_glow_background.dart';
 import 'package:glowmind/widgets/minimalist_music_controls.dart';
+import 'package:glowmind/widgets/orbs/mood_orb_selector.dart';
 import 'package:glowmind/widgets/sleep_timer_dialog.dart';
 import 'package:glowmind/widgets/welcome_overlay.dart';
-import 'package:glowmind/widgets/orbs/mood_orb_selector.dart';
-import 'package:glowmind/widgets/interactive_glow_background.dart';
-import 'package:glowmind/nav.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 /// TikTok-style vertical mood swiper with full-screen immersive UI
 /// All controls are sticky overlays that don't scroll with the mood pages
@@ -29,9 +29,6 @@ class _VerticalMoodNavigatorState extends State<VerticalMoodNavigator> {
   bool _showWelcome = true;
   double _scrollProgress = 0.0; // 0.0 to 1.0 for gradient blending
   
-  // Scroll optimization
-  bool _isScrolling = false;
-
   // All moods in order
   final List<MoodType> _moods = [
     MoodType.sleep,
@@ -167,11 +164,8 @@ class _VerticalMoodNavigatorState extends State<VerticalMoodNavigator> {
           // Scrolling mood pages (orb only - background handled above)
           NotificationListener<ScrollNotification>(
             onNotification: (notification) {
-              if (notification is ScrollStartNotification) {
-                _isScrolling = true;
-              } else if (notification is ScrollEndNotification) {
-                _isScrolling = false;
-                // Ensure final state update when scroll ends
+              // Ensure final state update when scroll ends
+              if (notification is ScrollEndNotification) {
                 if (mounted) setState(() {});
               }
               return false;

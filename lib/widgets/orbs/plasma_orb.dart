@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:glowmind/widgets/orbs/base_orb.dart';
 
@@ -342,6 +343,7 @@ class _PlasmaCorePainter extends CustomPainter {
             const Color(0xFFF43F5E).withValues(alpha: 0.1 * pulse),
             Colors.transparent,
           ],
+          [0.0, 0.5, 1.0], // Required colorStops
         );
 
       canvas.drawCircle(

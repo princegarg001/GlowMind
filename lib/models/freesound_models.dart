@@ -1,4 +1,5 @@
 /// Data models for Freesound API responses
+library;
 
 /// Represents a sound from Freesound API
 class FreesoundSound {

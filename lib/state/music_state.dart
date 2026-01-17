@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:glowmind/models/music_models.dart';
 import 'package:glowmind/services/audio_service.dart';
@@ -23,6 +24,7 @@ class MusicState extends ChangeNotifier {
   UserMusicPreferences? _preferences;
   bool _isLoading = false;
   String? _userId;
+  String? _lastError;
 
   // Playlists cache
   final Map<MoodType, List<Playlist>> _playlistsCache = {};
@@ -34,6 +36,7 @@ class MusicState extends ChangeNotifier {
   StreamSubscription? _positionSub;
   StreamSubscription? _durationSub;
   StreamSubscription? _sleepTimerSub;
+  StreamSubscription? _errorSub;
 
   // Getters
   MoodType get currentMood => _currentMood;
@@ -48,6 +51,7 @@ class MusicState extends ChangeNotifier {
   SleepTimer? get sleepTimer => _sleepTimer;
   bool get isLoading => _isLoading;
   UserMusicPreferences? get preferences => _preferences;
+  String? get lastError => _lastError;
 
   MusicState({
     required AudioService audioService,
@@ -88,6 +92,25 @@ class MusicState extends ChangeNotifier {
       _sleepTimer = timer;
       notifyListeners();
     });
+    
+    // Subscribe to error stream
+    _errorSub = _audioService.errorStream.listen((error) {
+      _lastError = error;
+      notifyListeners();
+      // Clear error after 5 seconds
+      Future.delayed(const Duration(seconds: 5), () {
+        if (_lastError == error) {
+          _lastError = null;
+          notifyListeners();
+        }
+      });
+    });
+  }
+  
+  /// Clear current error
+  void clearError() {
+    _lastError = null;
+    notifyListeners();
   }
 
   /// Initialize music state for a user
@@ -147,20 +170,11 @@ class MusicState extends ChangeNotifier {
     }
   }
 
-  /// Check if default playlists exist for user
-  Future<bool> _checkDefaultPlaylists(String userId) async {
-    try {
-      final playlists = await _storage.loadPlaylists(userId, MoodType.sleep);
-      return playlists.isNotEmpty;
-    } catch (e) {
-      return false;
-    }
-  }
-
   /// Change current mood
-  Future<void> changeMood(MoodType mood, {bool forceAutoPlay = false}) async {
+  /// Set skipAutoPlay=true to load playlist without starting playback
+  Future<void> changeMood(MoodType mood, {bool forceAutoPlay = false, bool skipAutoPlay = false}) async {
     try {
-      debugPrint('MusicState: Changing mood to ${mood.name}, forceAutoPlay: $forceAutoPlay');
+      debugPrint('MusicState: Changing mood to ${mood.name}, forceAutoPlay: $forceAutoPlay, skipAutoPlay: $skipAutoPlay');
       _currentMood = mood;
       notifyListeners();
 
@@ -194,8 +208,11 @@ class MusicState extends ChangeNotifier {
 
         await _audioService.loadPlaylist(defaultPlaylist);
         
-        // Auto-play if enabled or forced (for initial login)
-        final shouldAutoPlay = forceAutoPlay || (_preferences?.autoPlay == true);
+        // Auto-play logic:
+        // 1. Skip if skipAutoPlay=true (explicit no-play request)
+        // 2. Always play if forceAutoPlay=true (initial load)
+        // 3. Always play when manually changing moods (mood swipe)
+        final shouldAutoPlay = !skipAutoPlay;
         debugPrint('MusicState: Should auto-play: $shouldAutoPlay');
         
         if (shouldAutoPlay) {
@@ -368,6 +385,13 @@ class MusicState extends ChangeNotifier {
       debugPrint('deletePlaylist error: $e');
     }
   }
+  
+  /// Refresh playlists for a specific mood (clears cache and reloads)
+  Future<void> refreshPlaylists(MoodType mood) async {
+    _playlistsCache.remove(mood);
+    await _loadMoodPlaylists(mood);
+    notifyListeners();
+  }
 
   @override
   void dispose() {
@@ -377,6 +401,7 @@ class MusicState extends ChangeNotifier {
     _positionSub?.cancel();
     _durationSub?.cancel();
     _sleepTimerSub?.cancel();
+    _errorSub?.cancel();
     _audioService.dispose();
     super.dispose();
   }

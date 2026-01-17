@@ -133,6 +133,7 @@ class _WelcomeOverlayState extends State<WelcomeOverlay>
                           Color(0xFFEC4899),
                           Color(0xFF8B5CF6),
                         ],
+                        stops: [0.0, 0.5, 1.0],
                       ).createShader(bounds),
                       child: const Text(
                         'GlowMind',

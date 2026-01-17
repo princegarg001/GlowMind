@@ -1,8 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:glowmind/models/freesound_models.dart';
 import 'package:glowmind/models/music_models.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Service for interacting with Freesound API via Supabase Edge Function
 class FreesoundService {
@@ -48,6 +47,8 @@ class FreesoundService {
     int pageSize = 15,
   }) async {
     try {
+      debugPrint('FreesoundService: Searching for mood: ${mood.name}, page: $page, pageSize: $pageSize');
+      
       final response = await _supabase.functions.invoke(
         'freesound-api',
         body: {
@@ -58,12 +59,18 @@ class FreesoundService {
         },
       );
 
+      debugPrint('FreesoundService: Response status: ${response.status}');
+      debugPrint('FreesoundService: Response data: ${response.data}');
+
       if (response.status != 200) {
         final error = response.data['error'] ?? 'Unknown error';
+        debugPrint('FreesoundService: API error: $error');
         throw Exception('Failed to search sounds: $error');
       }
 
-      return FreesoundSearchResponse.fromJson(response.data);
+      final searchResponse = FreesoundSearchResponse.fromJson(response.data);
+      debugPrint('FreesoundService: Found ${searchResponse.results.length} sounds');
+      return searchResponse;
     } catch (e) {
       debugPrint('FreesoundService.searchByMood error: $e');
       rethrow;
@@ -195,12 +202,29 @@ class FreesoundService {
     int trackCount = 10,
   }) async {
     try {
-      final response = await searchByMood(mood, pageSize: trackCount);
+      // First try mood-based search
+      var response = await searchByMood(mood, pageSize: trackCount);
+      
+      // If mood search returns nothing, try generic search
+      if (response.results.isEmpty) {
+        debugPrint('FreesoundService: Mood search returned 0 results, trying generic search');
+        response = await searchCustom('ambient music relaxing', pageSize: trackCount);
+      }
+      
+      // If still empty, try another generic query
+      if (response.results.isEmpty) {
+        debugPrint('FreesoundService: Generic search failed, trying broader search');
+        response = await searchCustom('music', pageSize: trackCount);
+      }
       
       final tracks = response.results
           .where((sound) => sound.bestPreviewUrl != null)
           .map((sound) => soundToTrack(sound))
           .toList();
+
+      if (tracks.isEmpty) {
+        throw Exception('No playable sounds found. Please try again later.');
+      }
 
       return Playlist(
         id: 'freesound_${mood.name}_${DateTime.now().millisecondsSinceEpoch}',
@@ -212,6 +236,70 @@ class FreesoundService {
       );
     } catch (e) {
       debugPrint('FreesoundService.createMoodPlaylist error: $e');
+      rethrow;
+    }
+  }
+
+  /// Create a random/surprise playlist without mood dependency
+  Future<Playlist> createRandomPlaylist(
+    String userId, {
+    int trackCount = 10,
+  }) async {
+    // Random search queries for variety
+    final queries = [
+      'ambient music relaxing',
+      'electronic chill',
+      'acoustic guitar peaceful',
+      'piano calm',
+      'nature sounds ambient',
+      'lo-fi beats',
+      'meditation peaceful',
+      'soft instrumental',
+    ];
+    
+    final randomQuery = queries[DateTime.now().millisecondsSinceEpoch % queries.length];
+    
+    try {
+      debugPrint('FreesoundService: Creating random playlist with query: $randomQuery');
+      final response = await searchCustom(randomQuery, pageSize: trackCount);
+      
+      if (response.results.isEmpty) {
+        // Fallback to a very generic query
+        final fallbackResponse = await searchCustom('music', pageSize: trackCount);
+        if (fallbackResponse.results.isEmpty) {
+          throw Exception('No sounds available. Please try again later.');
+        }
+        
+        final tracks = fallbackResponse.results
+            .where((sound) => sound.bestPreviewUrl != null)
+            .map((sound) => soundToTrack(sound))
+            .toList();
+        
+        return Playlist(
+          id: 'freesound_random_${DateTime.now().millisecondsSinceEpoch}',
+          userId: userId,
+          mood: MoodType.study, // Default mood
+          name: 'Surprise Mix',
+          tracks: tracks,
+          createdAt: DateTime.now(),
+        );
+      }
+      
+      final tracks = response.results
+          .where((sound) => sound.bestPreviewUrl != null)
+          .map((sound) => soundToTrack(sound))
+          .toList();
+
+      return Playlist(
+        id: 'freesound_random_${DateTime.now().millisecondsSinceEpoch}',
+        userId: userId,
+        mood: MoodType.study, // Default mood
+        name: 'Surprise Mix',
+        tracks: tracks,
+        createdAt: DateTime.now(),
+      );
+    } catch (e) {
+      debugPrint('FreesoundService.createRandomPlaylist error: $e');
       rethrow;
     }
   }
