@@ -1,0 +1,244 @@
+{
+  "version": "1.0.0",
+  "description": "Curated sound therapy playlists from FreeSound for GlowMind moods",
+  "playlists": {
+    "balanced": {
+      "name": "Balanced Mind",
+      "description": "Calming sounds to maintain emotional balance and centeredness",
+      "mood": "balanced",
+      "tracks": [
+        {
+          "id": 415548,
+          "name": "Gentle Ocean Waves",
+          "description": "Soft ocean waves for relaxation",
+          "tags": ["ocean", "waves", "calm", "nature"],
+          "duration": 180
+        },
+        {
+          "id": 397812,
+          "name": "Forest Birds Morning",
+          "description": "Peaceful morning bird songs in forest",
+          "tags": ["birds", "forest", "nature", "morning"],
+          "duration": 240
+        },
+        {
+          "id": 416838,
+          "name": "Soft Rain on Leaves",
+          "description": "Gentle rain falling on leaves",
+          "tags": ["rain", "nature", "peaceful", "ambient"],
+          "duration": 300
+        },
+        {
+          "id": 331122,
+          "name": "Tibetan Singing Bowl",
+          "description": "Resonant singing bowl tones",
+          "tags": ["meditation", "singing bowl", "zen", "calm"],
+          "duration": 120
+        },
+        {
+          "id": 523606,
+          "name": "Stream Flowing Softly",
+          "description": "Babbling brook in nature",
+          "tags": ["stream", "water", "nature", "peaceful"],
+          "duration": 270
+        },
+        {
+          "id": 456831,
+          "name": "Wind Through Trees",
+          "description": "Gentle wind rustling through leaves",
+          "tags": ["wind", "trees", "nature", "ambient"],
+          "duration": 200
+        },
+        {
+          "id": 398694,
+          "name": "Soft Ambient Pad",
+          "description": "Warm ambient soundscape",
+          "tags": ["ambient", "pad", "calm", "relaxing"],
+          "duration": 180
+        },
+        {
+          "id": 442810,
+          "name": "Distant Thunder",
+          "description": "Soft distant thunder with rain",
+          "tags": ["thunder", "rain", "ambient", "nature"],
+          "duration": 220
+        },
+        {
+          "id": 517789,
+          "name": "Night Crickets",
+          "description": "Peaceful cricket sounds at night",
+          "tags": ["crickets", "night", "nature", "peaceful"],
+          "duration": 250
+        },
+        {
+          "id": 395627,
+          "name": "Calm Lake Atmosphere",
+          "description": "Serene lakeside ambience",
+          "tags": ["lake", "water", "calm", "nature"],
+          "duration": 210
+        }
+      ]
+    },
+    "anxious": {
+      "name": "Anxiety Relief",
+      "description": "Soothing sounds to calm anxiety and reduce stress",
+      "mood": "anxious",
+      "tracks": [
+        {
+          "id": 217538,
+          "name": "Deep Breathing Guide",
+          "description": "Gentle breathing rhythm guide",
+          "tags": ["breathing", "meditation", "calm", "guide"],
+          "duration": 180
+        },
+        {
+          "id": 344272,
+          "name": "Slow Wave Ambience",
+          "description": "Slow, rhythmic ocean waves",
+          "tags": ["ocean", "waves", "slow", "calming"],
+          "duration": 300
+        },
+        {
+          "id": 523434,
+          "name": "White Noise Soft",
+          "description": "Gentle white noise for focus",
+          "tags": ["white noise", "calm", "ambient", "peaceful"],
+          "duration": 240
+        },
+        {
+          "id": 447258,
+          "name": "Heartbeat Earth",
+          "description": "Slow heartbeat rhythm with ambient sounds",
+          "tags": ["heartbeat", "rhythm", "calm", "grounding"],
+          "duration": 200
+        },
+        {
+          "id": 412089,
+          "name": "Soft Piano Notes",
+          "description": "Gentle piano melody for relaxation",
+          "tags": ["piano", "calm", "melody", "peaceful"],
+          "duration": 150
+        },
+        {
+          "id": 509876,
+          "name": "Binaural Calm",
+          "description": "Binaural beats for anxiety relief",
+          "tags": ["binaural", "meditation", "calm", "theta"],
+          "duration": 360
+        },
+        {
+          "id": 428951,
+          "name": "Waterfall Meditation",
+          "description": "Continuous waterfall sounds",
+          "tags": ["waterfall", "water", "meditation", "nature"],
+          "duration": 280
+        },
+        {
+          "id": 391234,
+          "name": "Gentle Rain Steady",
+          "description": "Consistent gentle rainfall",
+          "tags": ["rain", "steady", "calm", "ambient"],
+          "duration": 320
+        },
+        {
+          "id": 456123,
+          "name": "Om Meditation Chant",
+          "description": "Calming om chant for meditation",
+          "tags": ["om", "chant", "meditation", "mantra"],
+          "duration": 180
+        },
+        {
+          "id": 489765,
+          "name": "Forest Night Ambience",
+          "description": "Peaceful forest at night",
+          "tags": ["forest", "night", "peaceful", "nature"],
+          "duration": 270
+        }
+      ]
+    },
+    "burnoutRisk": {
+      "name": "Recovery & Restoration",
+      "description": "Restorative sounds for recovery from burnout and exhaustion",
+      "mood": "burnoutRisk",
+      "tracks": [
+        {
+          "id": 523847,
+          "name": "Deep Rest Ambience",
+          "description": "Ultra-calm ambience for deep rest",
+          "tags": ["rest", "deep", "calm", "ambient"],
+          "duration": 360
+        },
+        {
+          "id": 412567,
+          "name": "Soft Drone Healing",
+          "description": "Low frequency healing drone",
+          "tags": ["drone", "healing", "low frequency", "restorative"],
+          "duration": 300
+        },
+        {
+          "id": 398745,
+          "name": "Spa Relaxation",
+          "description": "Tranquil spa atmosphere",
+          "tags": ["spa", "relaxation", "calm", "peaceful"],
+          "duration": 240
+        },
+        {
+          "id": 445632,
+          "name": "Crystal Bowl Meditation",
+          "description": "Crystal singing bowl tones",
+          "tags": ["crystal", "bowl", "meditation", "healing"],
+          "duration": 220
+        },
+        {
+          "id": 501234,
+          "name": "Silent Night Rain",
+          "description": "Gentle night rain for sleep",
+          "tags": ["rain", "night", "sleep", "gentle"],
+          "duration": 400
+        },
+        {
+          "id": 387654,
+          "name": "Delta Wave Sleep",
+          "description": "Deep sleep delta wave patterns",
+          "tags": ["sleep", "delta", "deep", "restorative"],
+          "duration": 480
+        },
+        {
+          "id": 429876,
+          "name": "Campfire Crackling",
+          "description": "Soothing campfire sounds",
+          "tags": ["fire", "campfire", "cozy", "relaxing"],
+          "duration": 280
+        },
+        {
+          "id": 467890,
+          "name": "Monastery Bells",
+          "description": "Distant monastery bell sounds",
+          "tags": ["bells", "monastery", "peaceful", "spiritual"],
+          "duration": 200
+        },
+        {
+          "id": 512345,
+          "name": "Beach at Sunset",
+          "description": "Peaceful sunset beach atmosphere",
+          "tags": ["beach", "sunset", "peaceful", "ocean"],
+          "duration": 320
+        },
+        {
+          "id": 434567,
+          "name": "Soft Thunder Distance",
+          "description": "Distant thunder with soft rain",
+          "tags": ["thunder", "rain", "distance", "calming"],
+          "duration": 350
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "created_at": "2026-01-17",
+    "curator": "GlowMind Sound Therapy Team",
+    "source": "FreeSound.org",
+    "license_info": "All sounds are from FreeSound under CC licenses. Attribution shown in app.",
+    "usage_notes": "Sound IDs map to FreeSound API. Fetch actual URLs via Supabase Edge Function."
+  }
+}

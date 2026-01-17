@@ -36,6 +36,7 @@ flutter:
     - assets/audio/meditate/
     - assets/audio/focus/
     - assets/audio/nature/
+    - assets/curated_sound_playlists.json
 
 flutter_launcher_icons:
   android: true

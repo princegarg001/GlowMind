@@ -8,6 +8,7 @@ import 'package:glowmind/widgets/glow_background.dart';
 import 'package:glowmind/widgets/mood_chip.dart';
 import 'package:glowmind/widgets/breathing_orb.dart';
 import 'package:glowmind/widgets/welcome_overlay.dart';
+import 'package:glowmind/pages/sound_therapy/sound_therapy_page.dart';
 
 class GlowHomePage extends StatefulWidget {
   const GlowHomePage({super.key});
@@ -207,6 +208,55 @@ class _GlowHomePageState extends State<GlowHomePage> with TickerProviderStateMix
                       child: const Text('Start Glow Ritual',
                           style:
                               TextStyle(color: Colors.white, fontSize: 16)),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Soothing Sounds Button
+                  GestureDetector(
+                    onTap: () {
+                      // Navigate to sound therapy based on current mood
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SoundTherapyPage(
+                            mood: app.glow.mood,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 28),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(
+                          color: glowColor.withValues(alpha: 0.5),
+                          width: 2,
+                        ),
+                        color: Colors.white.withValues(alpha: 0.05),
+                        boxShadow: [
+                          BoxShadow(
+                              color: glowColor.withValues(alpha: 0.3), 
+                              blurRadius: 15),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.music_note,
+                            color: glowColor,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Soothing Sounds',
+                            style: TextStyle(color: Colors.white, fontSize: 16),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
 
