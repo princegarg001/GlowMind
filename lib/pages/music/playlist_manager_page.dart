@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:glowmind/models/music_models.dart';
 import 'package:glowmind/state/music_state.dart';
+import 'package:glowmind/services/freesound_service.dart';
+import 'package:glowmind/state/app_state.dart';
+import 'package:glowmind/theme.dart';
 
 /// Playlist manager page accessible via right swipe from mood pages
 class PlaylistManagerPage extends StatefulWidget {
@@ -287,12 +290,57 @@ class _AllPlaylistsTab extends StatelessWidget {
 }
 
 /// Surprise Me tab - auto-generate playlist
-class _SurpriseMeTab extends StatelessWidget {
+class _SurpriseMeTab extends StatefulWidget {
   const _SurpriseMeTab();
+
+  @override
+  State<_SurpriseMeTab> createState() => _SurpriseMeTabState();
+}
+
+class _SurpriseMeTabState extends State<_SurpriseMeTab> {
+  bool _isGenerating = false;
+  String? _error;
+
+  Future<void> _generatePlaylist(BuildContext context) async {
+    final musicState = context.read<MusicState>();
+    final appState = context.read<AppState>();
+    final userId = appState.user?.id ?? 'guest';
+
+    setState(() {
+      _isGenerating = true;
+      _error = null;
+    });
+
+    try {
+      final freesound = FreesoundService();
+      final playlist = await freesound.createMoodPlaylist(
+        musicState.currentMood,
+        userId,
+        trackCount: 10,
+      );
+
+      if (playlist.tracks.isEmpty) {
+        throw Exception('No sounds found for this mood.');
+      }
+
+      await musicState.playPlaylist(playlist);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      debugPrint('Error generating playlist: $e');
+      setState(() {
+        _error = e.toString().contains('Exception: ') ? e.toString().split('Exception: ')[1] : 'Failed to generate playlist. Please check your connection.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isGenerating = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final musicState = context.watch<MusicState>();
+    final scheme = Theme.of(context).colorScheme;
 
     return Center(
       child: Padding(
@@ -306,75 +354,53 @@ class _SurpriseMeTab extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
-                  colors: [
-                    Theme.of(context).colorScheme.primary,
-                    Theme.of(context).colorScheme.secondary,
-                  ],
+                  colors: [scheme.primary, scheme.secondary],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                    color: scheme.primary.withValues(alpha: 0.5),
                     blurRadius: 30,
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.auto_awesome,
-                color: Colors.white,
-                size: 50,
-              ),
+              child: _isGenerating
+                  ? const Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                    )
+                  : const Icon(Icons.auto_awesome, color: Colors.white, size: 50),
             ),
             const SizedBox(height: 32),
             const Text(
               'Surprise Me!',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Text(
-              'Generate a unique playlist based on ${musicState.currentMood.displayName} mood',
-              style: const TextStyle(
-                color: Colors.white60,
-                fontSize: 14,
-              ),
+              'Generate a unique playlist from Freesound based on ${musicState.currentMood.displayName} mood',
+              style: const TextStyle(color: Colors.white60, fontSize: 14),
               textAlign: TextAlign.center,
             ),
+            if (_error != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                _error!,
+                style: TextStyle(color: scheme.error, fontSize: 14),
+                textAlign: TextAlign.center,
+              ),
+            ],
             const SizedBox(height: 32),
             ElevatedButton(
-              onPressed: () {
-                // For now, just play the default playlist
-                final playlists = musicState.getCurrentMoodPlaylists();
-                if (playlists.isNotEmpty) {
-                  musicState.playPlaylist(playlists.first);
-                  Navigator.pop(context);
-                }
-              },
+              onPressed: _isGenerating ? null : () => _generatePlaylist(context),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
+                backgroundColor: scheme.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
               ),
-              child: const Text(
-                'Generate Playlist',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Note: Freesound API integration coming soon',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.4),
-                fontSize: 12,
-                fontStyle: FontStyle.italic,
+              child: Text(
+                _isGenerating ? 'Generating...' : 'Generate Playlist',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
           ],

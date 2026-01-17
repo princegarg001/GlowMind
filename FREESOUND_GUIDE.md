@@ -31,8 +31,8 @@ This guide explains how to integrate the Freesound API to fetch and play ambient
 
 ### Step 3: Get Your Credentials
 After approval, you'll receive:
-- **Client ID**: Used for OAuth2 authentication
-- **API Key**: Used for API requests (this is what we need)
+- **Client ID**: Used for OAuth2 authentication - W7eFYDKiDAZttradqVft
+- **API Key**: Used for API requests (this is what we need) - QDODuntRkC5I8w72iw9cQA0QUreRgXO3J4MAHIDD
 
 ---
 

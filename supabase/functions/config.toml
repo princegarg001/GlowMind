@@ -1,0 +1,5 @@
+# Supabase Edge Functions Configuration
+
+[freesound-api]
+# JWT verification disabled - using Freesound API key for auth
+verify_jwt = false
