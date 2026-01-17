@@ -7,6 +7,7 @@ import 'package:glowmind/state/app_state.dart';
 import 'package:glowmind/widgets/glow_background.dart';
 import 'package:glowmind/widgets/mood_chip.dart';
 import 'package:glowmind/widgets/breathing_orb.dart';
+import 'package:glowmind/widgets/welcome_overlay.dart';
 
 class GlowHomePage extends StatefulWidget {
   const GlowHomePage({super.key});
@@ -18,6 +19,7 @@ class GlowHomePage extends StatefulWidget {
 class _GlowHomePageState extends State<GlowHomePage> with TickerProviderStateMixin {
   bool _showOrb = false;
   bool _ritualMode = false;
+  bool _showWelcome = true;
   int _behaviorScore = 50;
   late AnimationController _pulseCtrl;
 
@@ -106,7 +108,7 @@ class _GlowHomePageState extends State<GlowHomePage> with TickerProviderStateMix
                               margin: const EdgeInsets.only(right: 8),
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: const Color(0xFF7C3AED).withOpacity(0.9),
+                                color: const Color(0xFF7C3AED).withValues(alpha: 0.9),
                                 boxShadow: const [
                                   BoxShadow(
                                     color: Color(0xFF8B5CF6),
@@ -146,10 +148,10 @@ class _GlowHomePageState extends State<GlowHomePage> with TickerProviderStateMix
                                   220 + (_pulseCtrl.value * 20 * _pulseSpeed()),
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: glowColor.withOpacity(0.4),
+                                color: glowColor.withValues(alpha: 0.4),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: glowColor.withOpacity(0.8),
+                                    color: glowColor.withValues(alpha: 0.8),
                                     blurRadius: 80,
                                     spreadRadius: 10,
                                   ),
@@ -199,7 +201,7 @@ class _GlowHomePageState extends State<GlowHomePage> with TickerProviderStateMix
                             colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)]),
                         boxShadow: [
                           BoxShadow(
-                              color: glowColor.withOpacity(0.5), blurRadius: 30),
+                              color: glowColor.withValues(alpha: 0.5), blurRadius: 30),
                         ],
                       ),
                       child: const Text('Start Glow Ritual',
@@ -223,11 +225,11 @@ class _GlowHomePageState extends State<GlowHomePage> with TickerProviderStateMix
                           margin: const EdgeInsets.symmetric(horizontal: 6),
                           width: 18,
                           decoration: BoxDecoration(
-                            color: c.withOpacity(0.7),
+                            color: c.withValues(alpha: 0.7),
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                  color: c.withOpacity(0.8), blurRadius: 10)
+                                  color: c.withValues(alpha: 0.8), blurRadius: 10)
                             ],
                           ),
                         );
@@ -245,7 +247,7 @@ class _GlowHomePageState extends State<GlowHomePage> with TickerProviderStateMix
           if (_showOrb)
             Positioned.fill(
               child: Container(
-                color: Colors.black.withOpacity(0.6),
+                color: Colors.black.withValues(alpha: 0.6),
                 child: Center(
                   child: BreathingOrb(
                       onCompleted: () => setState(() => _showOrb = false)),
@@ -276,7 +278,7 @@ class _GlowHomePageState extends State<GlowHomePage> with TickerProviderStateMix
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color:
-                                const Color(0xFF8B5CF6).withOpacity(0.4),
+                                const Color(0xFF8B5CF6).withValues(alpha: 0.4),
                             boxShadow: const [
                               BoxShadow(
                                   color: Color(0xFF8B5CF6), blurRadius: 120),
@@ -287,6 +289,14 @@ class _GlowHomePageState extends State<GlowHomePage> with TickerProviderStateMix
                     ),
                   ),
                 ),
+              ),
+            ),
+
+          // Welcome overlay - shown on first load
+          if (_showWelcome)
+            Positioned.fill(
+              child: WelcomeOverlay(
+                onComplete: () => setState(() => _showWelcome = false),
               ),
             ),
         ],
