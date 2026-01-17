@@ -303,10 +303,15 @@ class _SoundTherapyPageState extends State<SoundTherapyPage> {
                 ? Icon(Icons.volume_up, color: moodColor, size: 20)
                 : null,
             onTap: () async {
-              await musicState.playPlaylist(_playlist!.copyWith(
-                tracks: _playlist!.tracks,
-              ));
-              // TODO: Add a way to start from specific index
+              // Create a reordered playlist starting from selected track
+              final reorderedTracks = [
+                track,
+                ..._playlist!.tracks.where((t) => t.id != track.id),
+              ];
+              final reorderedPlaylist = _playlist!.copyWith(
+                tracks: reorderedTracks,
+              );
+              await musicState.playPlaylist(reorderedPlaylist);
             },
           ),
         );
