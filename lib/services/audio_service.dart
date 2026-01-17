@@ -100,8 +100,10 @@ class AudioService {
   /// Load and play a playlist
   Future<void> loadPlaylist(Playlist playlist, {int startIndex = 0}) async {
     try {
+      debugPrint('AudioService: Loading playlist "${playlist.name}" with ${playlist.tracks.length} tracks');
+      
       if (playlist.tracks.isEmpty) {
-        debugPrint('Cannot load empty playlist');
+        debugPrint('AudioService: Cannot load empty playlist');
         return;
       }
 
@@ -111,17 +113,23 @@ class AudioService {
 
       _playlistController.add(_currentPlaylist);
       await _loadCurrentTrack();
+      debugPrint('AudioService: Playlist loaded successfully');
     } catch (e) {
-      debugPrint('loadPlaylist error: $e');
+      debugPrint('AudioService: loadPlaylist error: $e');
     }
   }
 
   /// Load the current track into the player
   Future<void> _loadCurrentTrack() async {
     final track = currentTrack;
-    if (track == null) return;
+    if (track == null) {
+      debugPrint('AudioService: No current track to load');
+      return;
+    }
 
     try {
+      debugPrint('AudioService: Loading track "${track.name}" from ${track.source}');
+      debugPrint('AudioService: Track URL: ${track.url}');
       _trackController.add(track);
       
       // Load audio from URL or asset
@@ -130,8 +138,9 @@ class AudioService {
       } else {
         await _player.setUrl(track.url);
       }
+      debugPrint('AudioService: Track loaded successfully');
     } catch (e) {
-      debugPrint('_loadCurrentTrack error: $e');
+      debugPrint('AudioService: _loadCurrentTrack error: $e');
       // Try next track if this one fails
       await next();
     }
@@ -140,9 +149,11 @@ class AudioService {
   /// Play or resume playback
   Future<void> play() async {
     try {
+      debugPrint('AudioService: Starting playback...');
       await _player.play();
+      debugPrint('AudioService: Playback started, isPlaying: ${_player.playing}');
     } catch (e) {
-      debugPrint('play error: $e');
+      debugPrint('AudioService: play error: $e');
     }
   }
 

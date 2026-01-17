@@ -53,21 +53,29 @@ class AppState extends ChangeNotifier {
 
   Future<void> _onAuthChanged(dynamic supabaseUser) async {
     try {
+      debugPrint('AppState: Auth changed for user: ${supabaseUser.id}');
       _isLoading = true;
       notifyListeners();
 
       _authStatus = AuthStatus.signedIn;
       _user = await _dataService.loadUser(supabaseUser.id);
+      debugPrint('AppState: User loaded: ${_user != null}');
+      
+      // Initialize music even if user data fails to load
+      final userId = _user?.id ?? supabaseUser.id;
       
       if (_user != null) {
         await loadUserData();
-        // Initialize music state for user
-        if (_musicState != null) {
-          await _musicState!.initForUser(_user!.id);
-        }
+      }
+      
+      // Initialize music state for user
+      if (_musicState != null) {
+        debugPrint('AppState: Initializing music for user: $userId');
+        await _musicState!.initForUser(userId);
+        debugPrint('AppState: Music initialization complete');
       }
     } catch (e) {
-      debugPrint('Auth change error: $e');
+      debugPrint('AppState: Auth change error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -97,9 +105,16 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> continueAsGuest() async {
+    debugPrint('AppState: Continuing as guest');
     _authStatus = AuthStatus.guest;
     _user = const AppUser(id: 'guest', isGuest: true);
     notifyListeners();
+    
+    // Initialize music for guest user
+    if (_musicState != null) {
+      debugPrint('AppState: Initializing music for guest user');
+      await _musicState!.initForUser('guest');
+    }
   }
 
   Future<void> signOut() async {

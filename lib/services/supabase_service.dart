@@ -2,6 +2,129 @@ import 'package:flutter/foundation.dart';
 import 'package:glowmind/models/models.dart';
 import 'package:glowmind/supabase/supabase_config.dart';
 
+/// Static helper class for generic Supabase operations
+class SupabaseService {
+  static final _client = SupabaseConfig.client;
+
+  /// Select multiple rows from a table
+  static Future<List<Map<String, dynamic>>> select(
+    String table, {
+    Map<String, dynamic>? filters,
+    String? orderBy,
+    bool ascending = true,
+  }) async {
+    try {
+      var query = _client.from(table).select();
+      
+      if (filters != null) {
+        for (final entry in filters.entries) {
+          query = query.eq(entry.key, entry.value);
+        }
+      }
+      
+      List<dynamic> data;
+      if (orderBy != null) {
+        data = await query.order(orderBy, ascending: ascending);
+      } else {
+        data = await query;
+      }
+      
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('SupabaseService.select error ($table): $e');
+      return [];
+    }
+  }
+
+  /// Select a single row from a table
+  static Future<Map<String, dynamic>?> selectSingle(
+    String table, {
+    required Map<String, dynamic> filters,
+  }) async {
+    try {
+      var query = _client.from(table).select();
+      
+      for (final entry in filters.entries) {
+        query = query.eq(entry.key, entry.value);
+      }
+      
+      final data = await query.maybeSingle();
+      return data;
+    } catch (e) {
+      debugPrint('SupabaseService.selectSingle error ($table): $e');
+      return null;
+    }
+  }
+
+  /// Insert a row into a table
+  static Future<List<Map<String, dynamic>>> insert(
+    String table,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final result = await _client.from(table).insert(data).select();
+      return List<Map<String, dynamic>>.from(result);
+    } catch (e) {
+      debugPrint('SupabaseService.insert error ($table): $e');
+      return [];
+    }
+  }
+
+  /// Insert multiple rows into a table
+  static Future<List<Map<String, dynamic>>> insertMultiple(
+    String table,
+    List<Map<String, dynamic>> data,
+  ) async {
+    try {
+      if (data.isEmpty) return [];
+      final result = await _client.from(table).insert(data).select();
+      return List<Map<String, dynamic>>.from(result);
+    } catch (e) {
+      debugPrint('SupabaseService.insertMultiple error ($table): $e');
+      return [];
+    }
+  }
+
+  /// Update rows in a table
+  static Future<List<Map<String, dynamic>>> update(
+    String table,
+    Map<String, dynamic> data, {
+    required Map<String, dynamic> filters,
+  }) async {
+    try {
+      var query = _client.from(table).update(data);
+      
+      for (final entry in filters.entries) {
+        query = query.eq(entry.key, entry.value);
+      }
+      
+      final result = await query.select();
+      return List<Map<String, dynamic>>.from(result);
+    } catch (e) {
+      debugPrint('SupabaseService.update error ($table): $e');
+      return [];
+    }
+  }
+
+  /// Delete rows from a table
+  static Future<void> delete(
+    String table, {
+    required Map<String, dynamic> filters,
+  }) async {
+    try {
+      var query = _client.from(table).delete();
+      
+      for (final entry in filters.entries) {
+        query = query.eq(entry.key, entry.value);
+      }
+      
+      await query;
+    } catch (e) {
+      debugPrint('SupabaseService.delete error ($table): $e');
+    }
+  }
+}
+
 class SupabaseDataService {
   final _client = SupabaseConfig.client;
 

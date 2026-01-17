@@ -93,27 +93,36 @@ class MusicState extends ChangeNotifier {
   /// Initialize music state for a user
   Future<void> initForUser(String userId) async {
     try {
+      debugPrint('MusicState: Initializing for user: $userId');
       _isLoading = true;
       _userId = userId;
       notifyListeners();
 
       // Load preferences from local storage first
       _preferences = await _storage.loadLocalPreferences(userId);
+      debugPrint('MusicState: Local preferences loaded: ${_preferences != null}');
       
-      // Try to load from Supabase
-      final supabasePrefs = await _storage.loadSupabasePreferences(userId);
-      if (supabasePrefs != null) {
-        _preferences = supabasePrefs;
-        // Sync to local storage
-        await _storage.saveLocalPreferences(supabasePrefs);
-      } else if (_preferences != null) {
-        // Sync local preferences to Supabase
-        await _storage.saveSupabasePreferences(_preferences!);
-      } else {
-        // Create default preferences
-        _preferences = UserMusicPreferences(userId: userId);
+      // Try to load from Supabase (but don't fail if unavailable)
+      try {
+        final supabasePrefs = await _storage.loadSupabasePreferences(userId);
+        if (supabasePrefs != null) {
+          _preferences = supabasePrefs;
+          await _storage.saveLocalPreferences(supabasePrefs);
+          debugPrint('MusicState: Supabase preferences loaded');
+        }
+      } catch (e) {
+        debugPrint('MusicState: Supabase preferences not available: $e');
+      }
+      
+      // Create default preferences if none exist (with autoPlay enabled)
+      if (_preferences == null) {
+        _preferences = UserMusicPreferences(
+          userId: userId,
+          autoPlay: true, // Enable auto-play by default
+          volume: 0.7,
+        );
         await _storage.saveLocalPreferences(_preferences!);
-        await _storage.saveSupabasePreferences(_preferences!);
+        debugPrint('MusicState: Created default preferences with autoPlay=true');
       }
 
       // Apply preferences
@@ -123,21 +132,15 @@ class MusicState extends ChangeNotifier {
       await _audioService.setVolume(_volume);
       _audioService.setShuffle(_shuffle);
       _audioService.setLoopMode(_loopMode);
-
-      // Check if default playlists exist
-      final hasPlaylists = await _checkDefaultPlaylists(userId);
-      if (!hasPlaylists) {
-        await _storage.createDefaultPlaylists(userId);
-      }
+      debugPrint('MusicState: Applied preferences - volume: $_volume, autoPlay: ${_preferences!.autoPlay}');
 
       // Load last mood or default to sleep
-      if (_preferences!.lastMood != null) {
-        await changeMood(_preferences!.lastMood!);
-      } else {
-        await changeMood(MoodType.sleep);
-      }
+      final targetMood = _preferences!.lastMood ?? MoodType.sleep;
+      debugPrint('MusicState: Loading mood: ${targetMood.name}');
+      await changeMood(targetMood, forceAutoPlay: true);
+      
     } catch (e) {
-      debugPrint('initForUser error: $e');
+      debugPrint('MusicState: initForUser error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -155,8 +158,9 @@ class MusicState extends ChangeNotifier {
   }
 
   /// Change current mood
-  Future<void> changeMood(MoodType mood) async {
+  Future<void> changeMood(MoodType mood, {bool forceAutoPlay = false}) async {
     try {
+      debugPrint('MusicState: Changing mood to ${mood.name}, forceAutoPlay: $forceAutoPlay');
       _currentMood = mood;
       notifyListeners();
 
@@ -164,27 +168,45 @@ class MusicState extends ChangeNotifier {
       if (_userId != null && _preferences != null) {
         _preferences = _preferences!.copyWith(lastMood: mood);
         await _storage.saveLocalPreferences(_preferences!);
-        // Async save to Supabase (don't await)
-        _storage.saveSupabasePreferences(_preferences!);
+        // Async save to Supabase (don't await, may fail if tables don't exist)
+        try {
+          _storage.saveSupabasePreferences(_preferences!);
+        } catch (e) {
+          debugPrint('MusicState: Could not save to Supabase: $e');
+        }
       }
 
       // Load playlists for this mood
       await _loadMoodPlaylists(mood);
+      debugPrint('MusicState: Playlists loaded: ${_playlistsCache[mood]?.length ?? 0}');
 
       // Load default or last played playlist
       if (_playlistsCache[mood]?.isNotEmpty == true) {
         final defaultPlaylist = _playlistsCache[mood]!
             .firstWhere((p) => p.isDefault, orElse: () => _playlistsCache[mood]!.first);
         
+        debugPrint('MusicState: Loading playlist "${defaultPlaylist.name}" with ${defaultPlaylist.tracks.length} tracks');
+        
+        if (defaultPlaylist.tracks.isEmpty) {
+          debugPrint('MusicState: Warning - playlist has no tracks!');
+          return;
+        }
+
         await _audioService.loadPlaylist(defaultPlaylist);
         
-        // Auto-play if enabled
-        if (_preferences?.autoPlay == true) {
+        // Auto-play if enabled or forced (for initial login)
+        final shouldAutoPlay = forceAutoPlay || (_preferences?.autoPlay == true);
+        debugPrint('MusicState: Should auto-play: $shouldAutoPlay');
+        
+        if (shouldAutoPlay) {
+          debugPrint('MusicState: Starting playback...');
           await _audioService.play();
         }
+      } else {
+        debugPrint('MusicState: No playlists available for mood ${mood.name}');
       }
     } catch (e) {
-      debugPrint('changeMood error: $e');
+      debugPrint('MusicState: changeMood error: $e');
     }
   }
 

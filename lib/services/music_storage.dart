@@ -109,15 +109,22 @@ class MusicStorage {
     }
   }
 
-  /// Load playlists for a specific mood from Supabase
+  /// Load playlists for a specific mood from Supabase (with local fallback)
   Future<List<Playlist>> loadPlaylists(String userId, MoodType mood) async {
     try {
+      debugPrint('MusicStorage: Loading playlists for mood: ${mood.name}');
+      
       final data = await SupabaseService.select(
         'playlists',
         filters: {'user_id': userId, 'mood': mood.name},
         orderBy: 'created_at',
         ascending: false,
       );
+
+      if (data.isEmpty) {
+        debugPrint('MusicStorage: No playlists in Supabase, using local default');
+        return _getLocalDefaultPlaylist(userId, mood);
+      }
 
       final playlists = <Playlist>[];
       for (final item in data) {
@@ -129,11 +136,32 @@ class MusicStorage {
         }
       }
 
+      if (playlists.isEmpty || playlists.every((p) => p.tracks.isEmpty)) {
+        debugPrint('MusicStorage: Empty playlists from Supabase, using local default');
+        return _getLocalDefaultPlaylist(userId, mood);
+      }
+
+      debugPrint('MusicStorage: Loaded ${playlists.length} playlists from Supabase');
       return playlists;
     } catch (e) {
-      debugPrint('loadPlaylists error: $e');
-      return [];
+      debugPrint('MusicStorage: loadPlaylists error: $e - falling back to local');
+      return _getLocalDefaultPlaylist(userId, mood);
     }
+  }
+
+  /// Get local default playlist for a mood (fallback when Supabase unavailable)
+  List<Playlist> _getLocalDefaultPlaylist(String userId, MoodType mood) {
+    final playlist = Playlist(
+      id: '${userId}_${mood.name}_local',
+      userId: userId,
+      mood: mood,
+      name: '${mood.displayName} Sounds',
+      isDefault: true,
+      tracks: _getDefaultTracks(mood),
+      createdAt: DateTime.now(),
+    );
+    debugPrint('MusicStorage: Created local playlist with ${playlist.tracks.length} tracks');
+    return [playlist];
   }
 
   /// Load tracks for a specific playlist from Supabase

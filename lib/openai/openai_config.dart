@@ -43,4 +43,24 @@ class OpenAIClient {
       throw Exception('OpenAI request failed: ${res.statusCode}');
     }
   }
+
+  Future<bool> testConnection() async {
+    try {
+      if (endpoint.isEmpty || apiKey.isEmpty) return false;
+      final uri = Uri.parse(endpoint);
+      final headers = {'Authorization': 'Bearer $apiKey', 'Content-Type': 'application/json'};
+      final body = jsonEncode({
+        'model': 'gpt-4o-mini',
+        'messages': [
+          {'role': 'user', 'content': 'hi'}
+        ],
+        'max_tokens': 5,
+      });
+      final res = await _client.post(uri, headers: headers, body: body);
+      return res.statusCode >= 200 && res.statusCode < 300;
+    } catch (e) {
+      debugPrint('OpenAI test connection failed: $e');
+      return false;
+    }
+  }
 }
