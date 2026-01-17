@@ -7,7 +7,7 @@ import 'package:glowmind/state/music_state.dart';
 import 'package:glowmind/widgets/minimalist_music_controls.dart';
 import 'package:glowmind/widgets/sleep_timer_dialog.dart';
 import 'package:glowmind/widgets/welcome_overlay.dart';
-import 'package:glowmind/widgets/mood_orb.dart';
+import 'package:glowmind/widgets/orbs/mood_orb_selector.dart';
 import 'package:glowmind/widgets/interactive_glow_background.dart';
 import 'package:glowmind/nav.dart';
 
@@ -382,29 +382,17 @@ class MoodPageOrb extends StatelessWidget {
 
   const MoodPageOrb({super.key, required this.mood});
 
-  double _getPulseSpeed() {
-    switch (mood) {
-      case MoodType.sleep:
-        return 0.4;
-      case MoodType.study:
-        return 0.7;
-      case MoodType.party:
-        return 1.4;
-      case MoodType.meditate:
-        return 0.3;
-      case MoodType.deepFocus:
-        return 0.5;
-      case MoodType.nature:
-        return 0.6;
-    }
-  }
-
   @override
-  Widget build(BuildContext context) => Center(
-        child: MoodOrb(
-          mood: mood,
-          size: 280,
-          pulseSpeed: _getPulseSpeed(),
-        ),
-      );
+  Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final orbSize = screenSize.width < 400 ? 240.0 : 300.0;
+    
+    return Center(
+      child: MoodOrbSelector(
+        mood: mood,
+        size: orbSize,
+        intensity: 1.0,
+      ),
+    );
+  }
 }
