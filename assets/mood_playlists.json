@@ -1,0 +1,218 @@
+{
+  "balanced": [
+    {
+      "name": "Gentle Ocean Waves",
+      "freesound_id": "16510",
+      "description": "Peaceful ocean waves lapping at the shore",
+      "duration": 120,
+      "tags": ["ocean", "waves", "nature", "calming"]
+    },
+    {
+      "name": "Soft Rain on Leaves",
+      "freesound_id": "22730",
+      "description": "Gentle rainfall in the forest",
+      "duration": 180,
+      "tags": ["rain", "nature", "peaceful", "ambient"]
+    },
+    {
+      "name": "Morning Forest Birds",
+      "freesound_id": "427612",
+      "description": "Birds singing in a peaceful forest",
+      "duration": 150,
+      "tags": ["birds", "nature", "forest", "morning"]
+    },
+    {
+      "name": "Wind Chimes",
+      "freesound_id": "428156",
+      "description": "Delicate wind chimes in breeze",
+      "duration": 90,
+      "tags": ["wind-chimes", "peaceful", "meditation"]
+    },
+    {
+      "name": "Meditation Bell",
+      "freesound_id": "410538",
+      "description": "Clear meditation bell tone",
+      "duration": 30,
+      "tags": ["meditation", "bell", "mindfulness"]
+    },
+    {
+      "name": "Distant Ocean Surf",
+      "freesound_id": "18228",
+      "description": "Rhythmic ocean surf from afar",
+      "duration": 140,
+      "tags": ["ocean", "surf", "nature", "rhythmic"]
+    },
+    {
+      "name": "Steady Rainfall",
+      "freesound_id": "399656",
+      "description": "Continuous soothing rain",
+      "duration": 200,
+      "tags": ["rain", "steady", "ambient", "sleep"]
+    },
+    {
+      "name": "Woodland Ambience",
+      "freesound_id": "481443",
+      "description": "Birds and gentle forest sounds",
+      "duration": 160,
+      "tags": ["forest", "birds", "ambient", "nature"]
+    },
+    {
+      "name": "Peaceful Wind Chimes",
+      "freesound_id": "271929",
+      "description": "Harmonious wind chime melody",
+      "duration": 100,
+      "tags": ["wind-chimes", "harmony", "peaceful"]
+    },
+    {
+      "name": "Light Rain",
+      "freesound_id": "31592",
+      "description": "Gentle light rain patter",
+      "duration": 130,
+      "tags": ["rain", "light", "soothing", "nature"]
+    }
+  ],
+  "anxious": [
+    {
+      "name": "Deep Breathing Guide",
+      "freesound_id": "376088",
+      "description": "Calming breathing pattern to follow",
+      "duration": 180,
+      "tags": ["breathing", "meditation", "calm", "anxiety"]
+    },
+    {
+      "name": "Slow Heartbeat",
+      "freesound_id": "206370",
+      "description": "Gentle rhythmic heartbeat sound",
+      "duration": 120,
+      "tags": ["heartbeat", "rhythm", "calming", "meditation"]
+    },
+    {
+      "name": "Theta Wave Meditation",
+      "freesound_id": "571841",
+      "description": "Theta brainwave frequencies for relaxation",
+      "duration": 300,
+      "tags": ["theta-waves", "meditation", "brainwave", "deep-relaxation"]
+    },
+    {
+      "name": "Tibetan Singing Bowl",
+      "freesound_id": "390936",
+      "description": "Resonant singing bowl meditation",
+      "duration": 90,
+      "tags": ["tibetan-bowl", "meditation", "healing", "resonance"]
+    },
+    {
+      "name": "Calm Piano Melody",
+      "freesound_id": "478283",
+      "description": "Soft piano for peaceful mind",
+      "duration": 140,
+      "tags": ["piano", "calm", "melody", "peaceful"]
+    },
+    {
+      "name": "Mindful Breathing",
+      "freesound_id": "542867",
+      "description": "Guided breathing for anxiety relief",
+      "duration": 150,
+      "tags": ["breathing", "mindfulness", "anxiety-relief"]
+    },
+    {
+      "name": "Healing Bowl Tones",
+      "freesound_id": "269554",
+      "description": "Multiple Tibetan bowl harmonies",
+      "duration": 110,
+      "tags": ["tibetan-bowl", "healing", "harmony", "meditation"]
+    },
+    {
+      "name": "Gentle Piano Ambience",
+      "freesound_id": "533488",
+      "description": "Ambient piano for relaxation",
+      "duration": 160,
+      "tags": ["piano", "ambient", "relaxation", "calm"]
+    },
+    {
+      "name": "Ocean Meditation",
+      "freesound_id": "257538",
+      "description": "Ocean waves for meditation",
+      "duration": 180,
+      "tags": ["ocean", "meditation", "waves", "calm"]
+    },
+    {
+      "name": "Forest Peace",
+      "freesound_id": "391665",
+      "description": "Tranquil forest environment",
+      "duration": 170,
+      "tags": ["forest", "peace", "nature", "tranquil"]
+    }
+  ],
+  "burnoutRisk": [
+    {
+      "name": "Deep Sleep Ambience",
+      "freesound_id": "528664",
+      "description": "Deep relaxation for rest and recovery",
+      "duration": 240,
+      "tags": ["deep-sleep", "relaxation", "recovery", "rest"]
+    },
+    {
+      "name": "Brown Noise",
+      "freesound_id": "412031",
+      "description": "Deep brown noise for sleep",
+      "duration": 300,
+      "tags": ["brown-noise", "sleep", "deep", "ambient"]
+    },
+    {
+      "name": "Delta Wave Sleep",
+      "freesound_id": "571842",
+      "description": "Delta brainwaves for deep rest",
+      "duration": 360,
+      "tags": ["delta-waves", "deep-sleep", "brainwave", "recovery"]
+    },
+    {
+      "name": "Waterfall Sanctuary",
+      "freesound_id": "334434",
+      "description": "Gentle waterfall in nature",
+      "duration": 200,
+      "tags": ["waterfall", "nature", "peaceful", "sanctuary"]
+    },
+    {
+      "name": "Spa Relaxation",
+      "freesound_id": "441646",
+      "description": "Calm spa environment sounds",
+      "duration": 220,
+      "tags": ["spa", "relaxation", "calm", "healing"]
+    },
+    {
+      "name": "Soft Brown Noise",
+      "freesound_id": "426851",
+      "description": "Gentle brown noise for focus and sleep",
+      "duration": 280,
+      "tags": ["brown-noise", "sleep", "focus", "ambient"]
+    },
+    {
+      "name": "Distant Waterfall",
+      "freesound_id": "368851",
+      "description": "Peaceful waterfall from distance",
+      "duration": 180,
+      "tags": ["waterfall", "distant", "peaceful", "nature"]
+    },
+    {
+      "name": "White Noise Comfort",
+      "freesound_id": "412032",
+      "description": "Soothing white noise",
+      "duration": 300,
+      "tags": ["white-noise", "comfort", "sleep", "ambient"]
+    },
+    {
+      "name": "Mountain Waterfall",
+      "freesound_id": "146446",
+      "description": "Natural waterfall sounds",
+      "duration": 190,
+      "tags": ["waterfall", "mountain", "nature", "peaceful"]
+    },
+    {
+      "name": "Healing Chimes",
+      "freesound_id": "214549",
+      "description": "Deep healing wind chimes",
+      "duration": 120,
+      "tags": ["wind-chimes", "healing", "deep", "meditation"]
+    }
+  ]
+}

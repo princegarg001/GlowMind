@@ -187,6 +187,35 @@ class _GlowHomePageState extends State<GlowHomePage> with TickerProviderStateMix
 
                   const SizedBox(height: 20),
 
+                  // Soothing Sounds Button
+                  GestureDetector(
+                    onTap: () => context.push(AppRoutes.playlistForMood(app.glow.mood)),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 28),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(color: glowColor, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                              color: glowColor.withOpacity(0.3), blurRadius: 20),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.music_note, color: glowColor, size: 20),
+                          const SizedBox(width: 8),
+                          const Text('Soothing Sounds',
+                              style:
+                                  TextStyle(color: Colors.white, fontSize: 16)),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
                   // Ritual Mode Button
                   GestureDetector(
                     onTap: () => setState(() => _ritualMode = true),
