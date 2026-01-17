@@ -3,8 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:glowmind/models/models.dart';
 import 'package:glowmind/models/music_models.dart';
 import 'package:glowmind/services/sound_therapy_service.dart';
-import 'package:glowmind/services/audio_service.dart';
 import 'package:glowmind/state/app_state.dart';
+import 'package:glowmind/state/music_state.dart';
 import 'package:glowmind/widgets/sleep_timer_dialog.dart';
 
 /// Sound therapy playlist page with playback controls
@@ -22,50 +22,15 @@ class SoundTherapyPage extends StatefulWidget {
 
 class _SoundTherapyPageState extends State<SoundTherapyPage> {
   final SoundTherapyService _soundService = SoundTherapyService();
-  final AudioService _audioService = AudioService();
   
   Playlist? _playlist;
   bool _isLoading = true;
   String? _error;
-  bool _isPlaying = false;
-  Track? _currentTrack;
-  int _currentTrackIndex = 0;
-  LoopMode _loopMode = LoopMode.all;
-  bool _shuffle = false;
-  Duration _position = Duration.zero;
-  Duration? _duration;
 
   @override
   void initState() {
     super.initState();
     _loadPlaylist();
-    _setupListeners();
-  }
-
-  void _setupListeners() {
-    _audioService.isPlayingStream.listen((playing) {
-      if (mounted) {
-        setState(() => _isPlaying = playing);
-      }
-    });
-
-    _audioService.trackStream.listen((track) {
-      if (mounted) {
-        setState(() => _currentTrack = track);
-      }
-    });
-
-    _audioService.positionStream.listen((pos) {
-      if (mounted) {
-        setState(() => _position = pos);
-      }
-    });
-
-    _audioService.durationStream.listen((dur) {
-      if (mounted) {
-        setState(() => _duration = dur);
-      }
-    });
   }
 
   Future<void> _loadPlaylist() async {
@@ -93,9 +58,9 @@ class _SoundTherapyPageState extends State<SoundTherapyPage> {
         _isLoading = false;
       });
 
-      // Auto-load and play the playlist
-      await _audioService.loadPlaylist(playlist);
-      await _audioService.play();
+      // Auto-load and play the playlist using MusicState
+      final musicState = context.read<MusicState>();
+      await musicState.playPlaylist(playlist);
       
     } catch (e) {
       setState(() {
@@ -106,12 +71,13 @@ class _SoundTherapyPageState extends State<SoundTherapyPage> {
   }
 
   void _showSleepTimer() {
+    final musicState = context.read<MusicState>();
     showDialog(
       context: context,
       builder: (context) => SleepTimerDialog(
-        currentTimer: _audioService.sleepTimer,
-        onStart: (duration) => _audioService.startSleepTimer(duration),
-        onCancel: () => _audioService.cancelSleepTimer(),
+        currentTimer: musicState.sleepTimer,
+        onStart: (duration) => musicState.startSleepTimer(duration),
+        onCancel: () => musicState.cancelSleepTimer(),
       ),
     );
   }
@@ -147,6 +113,7 @@ class _SoundTherapyPageState extends State<SoundTherapyPage> {
   @override
   Widget build(BuildContext context) {
     final moodColor = _getMoodColor();
+    final musicState = context.watch<MusicState>();
     
     return Scaffold(
       body: Container(
@@ -219,6 +186,8 @@ class _SoundTherapyPageState extends State<SoundTherapyPage> {
   }
 
   Widget _buildContent(Color moodColor) {
+    final musicState = context.watch<MusicState>();
+    
     if (_isLoading) {
       return Center(
         child: Column(
@@ -278,7 +247,7 @@ class _SoundTherapyPageState extends State<SoundTherapyPage> {
       itemCount: _playlist!.tracks.length,
       itemBuilder: (context, index) {
         final track = _playlist!.tracks[index];
-        final isCurrentTrack = _currentTrack?.id == track.id;
+        final isCurrentTrack = musicState.currentTrack?.id == track.id;
         
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -311,7 +280,7 @@ class _SoundTherapyPageState extends State<SoundTherapyPage> {
                 ),
               ),
               child: Icon(
-                isCurrentTrack && _isPlaying 
+                isCurrentTrack && musicState.isPlaying 
                     ? Icons.graphic_eq 
                     : Icons.music_note,
                 color: moodColor,
@@ -334,9 +303,10 @@ class _SoundTherapyPageState extends State<SoundTherapyPage> {
                 ? Icon(Icons.volume_up, color: moodColor, size: 20)
                 : null,
             onTap: () async {
-              setState(() => _currentTrackIndex = index);
-              await _audioService.loadPlaylist(_playlist!, startIndex: index);
-              await _audioService.play();
+              await musicState.playPlaylist(_playlist!.copyWith(
+                tracks: _playlist!.tracks,
+              ));
+              // TODO: Add a way to start from specific index
             },
           ),
         );
@@ -345,6 +315,8 @@ class _SoundTherapyPageState extends State<SoundTherapyPage> {
   }
 
   Widget _buildPlaybackControls(Color moodColor) {
+    final musicState = context.watch<MusicState>();
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -361,13 +333,13 @@ class _SoundTherapyPageState extends State<SoundTherapyPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           // Current track info
-          if (_currentTrack != null)
+          if (musicState.currentTrack != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: Column(
                 children: [
                   Text(
-                    _currentTrack!.name,
+                    musicState.currentTrack!.name,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
@@ -390,10 +362,10 @@ class _SoundTherapyPageState extends State<SoundTherapyPage> {
                       overlayColor: moodColor.withOpacity(0.3),
                     ),
                     child: Slider(
-                      value: _position.inSeconds.toDouble(),
-                      max: (_duration?.inSeconds ?? 1).toDouble(),
+                      value: musicState.position.inSeconds.toDouble(),
+                      max: (musicState.duration?.inSeconds ?? 1).toDouble(),
                       onChanged: (value) {
-                        _audioService.seek(Duration(seconds: value.toInt()));
+                        musicState.seek(Duration(seconds: value.toInt()));
                       },
                     ),
                   ),
@@ -403,11 +375,11 @@ class _SoundTherapyPageState extends State<SoundTherapyPage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          _formatDuration(_position),
+                          _formatDuration(musicState.position),
                           style: const TextStyle(color: Colors.white60, fontSize: 12),
                         ),
                         Text(
-                          _formatDuration(_duration ?? Duration.zero),
+                          _formatDuration(musicState.duration ?? Duration.zero),
                           style: const TextStyle(color: Colors.white60, fontSize: 12),
                         ),
                       ],
@@ -425,11 +397,10 @@ class _SoundTherapyPageState extends State<SoundTherapyPage> {
               IconButton(
                 icon: Icon(
                   Icons.shuffle,
-                  color: _shuffle ? moodColor : Colors.white60,
+                  color: musicState.shuffle ? moodColor : Colors.white60,
                 ),
                 onPressed: () {
-                  setState(() => _shuffle = !_shuffle);
-                  _audioService.setShuffle(_shuffle);
+                  musicState.toggleShuffle();
                 },
               ),
 
@@ -437,7 +408,7 @@ class _SoundTherapyPageState extends State<SoundTherapyPage> {
               IconButton(
                 icon: const Icon(Icons.skip_previous, color: Colors.white),
                 iconSize: 36,
-                onPressed: () => _audioService.previous(),
+                onPressed: () => musicState.previous(),
               ),
 
               // Play/Pause
@@ -457,11 +428,11 @@ class _SoundTherapyPageState extends State<SoundTherapyPage> {
                 ),
                 child: IconButton(
                   icon: Icon(
-                    _isPlaying ? Icons.pause : Icons.play_arrow,
+                    musicState.isPlaying ? Icons.pause : Icons.play_arrow,
                     color: Colors.white,
                   ),
                   iconSize: 36,
-                  onPressed: () => _audioService.togglePlayPause(),
+                  onPressed: () => musicState.togglePlayPause(),
                 ),
               ),
 
@@ -469,22 +440,21 @@ class _SoundTherapyPageState extends State<SoundTherapyPage> {
               IconButton(
                 icon: const Icon(Icons.skip_next, color: Colors.white),
                 iconSize: 36,
-                onPressed: () => _audioService.next(),
+                onPressed: () => musicState.next(),
               ),
 
               // Loop mode
               IconButton(
                 icon: Icon(
-                  _loopMode == LoopMode.off
+                  musicState.loopMode == LoopMode.off
                       ? Icons.repeat
-                      : _loopMode == LoopMode.one
+                      : musicState.loopMode == LoopMode.one
                           ? Icons.repeat_one
                           : Icons.repeat,
-                  color: _loopMode == LoopMode.off ? Colors.white60 : moodColor,
+                  color: musicState.loopMode == LoopMode.off ? Colors.white60 : moodColor,
                 ),
                 onPressed: () {
-                  _audioService.cycleLoopMode();
-                  setState(() => _loopMode = _audioService.loopMode);
+                  musicState.cycleLoopMode();
                 },
               ),
             ],
