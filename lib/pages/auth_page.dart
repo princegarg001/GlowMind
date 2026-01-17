@@ -146,6 +146,16 @@ class _AuthCardState extends State<_AuthCard> {
     }
   }
 
+  Future<void> _handleGuestContinue() async {
+    setState(() => _isLoading = true);
+    try {
+      await context.read<AppState>().continueAsGuest();
+      if (mounted) context.go(AppRoutes.home);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -197,12 +207,7 @@ class _AuthCardState extends State<_AuthCard> {
             ),
             const Divider(height: 32, color: Color(0xFF2A2450)),
             OutlinedButton.icon(
-              onPressed: _isLoading
-                  ? null
-                  : () async {
-                      await context.read<AppState>().continueAsGuest();
-                      if (context.mounted) context.go(AppRoutes.home);
-                    },
+              onPressed: _isLoading ? null : _handleGuestContinue,
               icon: const Icon(Icons.bolt, color: Color(0xFF8B5CF6)),
               label: const Text('Continue as guest'),
               style: OutlinedButton.styleFrom(
