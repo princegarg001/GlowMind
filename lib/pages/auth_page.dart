@@ -156,7 +156,9 @@ class _AuthCardState extends State<_AuthCard> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to continue as guest: $e')),
+          const SnackBar(
+            content: Text('Unable to continue as guest. Please try again.'),
+          ),
         );
       }
     } finally {
