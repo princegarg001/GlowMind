@@ -105,15 +105,26 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> continueAsGuest() async {
-    debugPrint('AppState: Continuing as guest');
-    _authStatus = AuthStatus.guest;
-    _user = const AppUser(id: 'guest', isGuest: true);
-    notifyListeners();
-    
-    // Initialize music for guest user
-    if (_musicState != null) {
-      debugPrint('AppState: Initializing music for guest user');
-      await _musicState!.initForUser('guest');
+    try {
+      debugPrint('AppState: Continuing as guest');
+      _authStatus = AuthStatus.guest;
+      _user = const AppUser(id: 'guest', isGuest: true);
+      notifyListeners();
+      
+      // Initialize music for guest user
+      if (_musicState != null) {
+        debugPrint('AppState: Initializing music for guest user');
+        try {
+          await _musicState!.initForUser('guest');
+          debugPrint('AppState: Guest music initialization completed');
+        } catch (e) {
+          debugPrint('AppState: Guest music initialization failed: $e');
+          // Don't fail the guest login if music fails to initialize
+        }
+      }
+    } catch (e) {
+      debugPrint('AppState: continueAsGuest error: $e');
+      rethrow;
     }
   }
 
