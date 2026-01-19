@@ -208,6 +208,12 @@ class _VerticalMoodNavigatorState extends State<VerticalMoodNavigator> {
                           // Right side buttons
                           Row(
                             children: [
+                              // Insights button
+                              _GlassIconButton(
+                                icon: Icons.insights,
+                                onTap: () => context.push(AppRoutes.insights),
+                              ),
+                              const SizedBox(width: 12),
                               // Playlist button
                               _GlassIconButton(
                                 icon: Icons.queue_music,

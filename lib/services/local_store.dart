@@ -1,7 +1,8 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:glowmind/models/models.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LocalStore {
   SharedPreferences? _prefs;
@@ -25,6 +26,7 @@ class LocalStore {
   static const _kUser = 'user';
   static const _kNotes = 'notes';
   static const _kSleep = 'sleep_profile';
+  static const _kMoodHistory = 'mood_history';
 
   Future<AuthStatus> loadAuthStatus() async {
     await _ensure();
@@ -130,4 +132,70 @@ class LocalStore {
       debugPrint('saveSleepProfile error: $e');
     }
   }
+
+  /// Load mood history entries
+  Future<List<MoodHistoryEntry>> loadMoodHistory() async {
+    await _ensure();
+    try {
+      final raw = _prefs?.getString(_kMoodHistory);
+      if (raw == null) return [];
+      final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+      return list.map((m) => MoodHistoryEntry.fromJson(m)).toList();
+    } catch (e) {
+      debugPrint('loadMoodHistory error: $e');
+      return [];
+    }
+  }
+
+  /// Save a mood entry to history
+  Future<void> saveMoodEntry(MoodHistoryEntry entry) async {
+    await _ensure();
+    try {
+      final history = await loadMoodHistory();
+      history.add(entry);
+      // Keep only the last 1000 entries to prevent excessive storage
+      final trimmed = history.length > 1000 
+          ? history.sublist(history.length - 1000) 
+          : history;
+      final list = trimmed.map((e) => e.toJson()).toList();
+      await _prefs?.setString(_kMoodHistory, jsonEncode(list));
+    } catch (e) {
+      debugPrint('saveMoodEntry error: $e');
+    }
+  }
+
+  /// Clear all mood history
+  Future<void> clearMoodHistory() async {
+    await _ensure();
+    try {
+      await _prefs?.remove(_kMoodHistory);
+    } catch (e) {
+      debugPrint('clearMoodHistory error: $e');
+    }
+  }
+}
+
+/// Represents a single mood selection event for insights tracking
+class MoodHistoryEntry {
+  final String mood;
+  final DateTime timestamp;
+  final int durationSeconds; // How long user stayed in this mood
+
+  const MoodHistoryEntry({
+    required this.mood,
+    required this.timestamp,
+    this.durationSeconds = 0,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'mood': mood,
+        'timestamp': timestamp.toIso8601String(),
+        'duration_seconds': durationSeconds,
+      };
+
+  static MoodHistoryEntry fromJson(Map<String, dynamic> json) => MoodHistoryEntry(
+        mood: json['mood'] as String,
+        timestamp: DateTime.parse(json['timestamp'] as String),
+        durationSeconds: json['duration_seconds'] as int? ?? 0,
+      );
 }

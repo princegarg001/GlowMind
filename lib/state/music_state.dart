@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:glowmind/models/music_models.dart';
 import 'package:glowmind/services/audio_service.dart';
+import 'package:glowmind/services/local_store.dart';
 import 'package:glowmind/services/music_storage.dart';
 
 /// State management for music playback and mood navigation
@@ -25,6 +26,11 @@ class MusicState extends ChangeNotifier {
   bool _isLoading = false;
   String? _userId;
   String? _lastError;
+  
+  // Mood history tracking
+  final LocalStore _localStore = LocalStore();
+  DateTime? _moodStartTime;
+  List<MoodHistoryEntry> _moodHistory = [];
 
   // Playlists cache
   final Map<MoodType, List<Playlist>> _playlistsCache = {};
@@ -52,6 +58,7 @@ class MusicState extends ChangeNotifier {
   bool get isLoading => _isLoading;
   UserMusicPreferences? get preferences => _preferences;
   String? get lastError => _lastError;
+  List<MoodHistoryEntry> get moodHistory => _moodHistory;
 
   MusicState({
     required AudioService audioService,
@@ -120,6 +127,9 @@ class MusicState extends ChangeNotifier {
       _isLoading = true;
       _userId = userId;
       notifyListeners();
+      
+      // Load mood history
+      _moodHistory = await _localStore.loadMoodHistory();
 
       // Load preferences from local storage first
       _preferences = await _storage.loadLocalPreferences(userId);
@@ -175,6 +185,19 @@ class MusicState extends ChangeNotifier {
   Future<void> changeMood(MoodType mood, {bool forceAutoPlay = false, bool skipAutoPlay = false}) async {
     try {
       debugPrint('MusicState: Changing mood to ${mood.name}, forceAutoPlay: $forceAutoPlay, skipAutoPlay: $skipAutoPlay');
+      
+      // Track mood history - save duration of previous mood
+      await _saveMoodDuration();
+      _moodStartTime = DateTime.now();
+      
+      // Save new mood entry
+      final entry = MoodHistoryEntry(
+        mood: mood.name,
+        timestamp: _moodStartTime!,
+      );
+      await _localStore.saveMoodEntry(entry);
+      _moodHistory = await _localStore.loadMoodHistory();
+      
       _currentMood = mood;
       notifyListeners();
 
@@ -391,6 +414,64 @@ class MusicState extends ChangeNotifier {
     _playlistsCache.remove(mood);
     await _loadMoodPlaylists(mood);
     notifyListeners();
+  }
+
+  /// Save duration of the previous mood when switching
+  Future<void> _saveMoodDuration() async {
+    if (_moodStartTime != null && _moodHistory.isNotEmpty) {
+      final duration = DateTime.now().difference(_moodStartTime!).inSeconds;
+      if (duration > 0) {
+        // Update the last entry with duration
+        final lastEntry = _moodHistory.last;
+        final updatedEntry = MoodHistoryEntry(
+          mood: lastEntry.mood,
+          timestamp: lastEntry.timestamp,
+          durationSeconds: duration,
+        );
+        _moodHistory[_moodHistory.length - 1] = updatedEntry;
+      }
+    }
+  }
+
+  /// Load mood history from local storage
+  Future<void> loadMoodHistory() async {
+    _moodHistory = await _localStore.loadMoodHistory();
+    notifyListeners();
+  }
+
+  /// Get mood statistics for insights
+  Map<String, int> getMoodCounts({int? daysBack}) {
+    final now = DateTime.now();
+    final cutoff = daysBack != null 
+        ? now.subtract(Duration(days: daysBack))
+        : null;
+    
+    final counts = <String, int>{};
+    for (final entry in _moodHistory) {
+      if (cutoff != null && entry.timestamp.isBefore(cutoff)) continue;
+      counts[entry.mood] = (counts[entry.mood] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  /// Get mood occurrences over time for chart data
+  List<Map<String, dynamic>> getMoodTrend({int days = 7}) {
+    final now = DateTime.now();
+    final result = <Map<String, dynamic>>[];
+    
+    for (int i = days - 1; i >= 0; i--) {
+      final date = DateTime(now.year, now.month, now.day - i);
+      final nextDate = date.add(const Duration(days: 1));
+      
+      int count = 0;
+      for (final entry in _moodHistory) {
+        if (entry.timestamp.isAfter(date) && entry.timestamp.isBefore(nextDate)) {
+          count++;
+        }
+      }
+      result.add({'date': date, 'count': count});
+    }
+    return result;
   }
 
   @override
