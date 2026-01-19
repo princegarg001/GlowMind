@@ -208,6 +208,12 @@ class _VerticalMoodNavigatorState extends State<VerticalMoodNavigator> {
                           // Right side buttons
                           Row(
                             children: [
+                              // Affirmations button
+                              _GlassIconButton(
+                                icon: Icons.auto_awesome,
+                                onTap: () => context.push(AppRoutes.affirmations),
+                              ),
+                              const SizedBox(width: 12),
                               // Insights button
                               _GlassIconButton(
                                 icon: Icons.insights,

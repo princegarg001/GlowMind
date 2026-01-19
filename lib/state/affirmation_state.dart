@@ -1,0 +1,308 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import '../models/affirmation.dart';
+import '../services/affirmation_service.dart';
+import '../services/audio_recorder_service.dart';
+
+/// State management for affirmations
+class AffirmationState extends ChangeNotifier {
+  final AffirmationService service;
+  final AudioRecorderService audioRecorder;
+
+  AffirmationState({
+    required this.service,
+    required this.audioRecorder,
+  });
+
+  List<Affirmation> _affirmations = [];
+  List<Affirmation> _favorites = [];
+  List<Affirmation> _voiceAffirmations = [];
+  AffirmationSettings _settings = const AffirmationSettings();
+  Affirmation? _dailyAffirmation;
+  bool _isLoading = false;
+  bool _isRecording = false;
+  String? _currentRecordingPath;
+  String? _error;
+  Duration _recordingDuration = Duration.zero;
+  Timer? _recordingTimer;
+
+  // Getters
+  List<Affirmation> get affirmations => _affirmations;
+  List<Affirmation> get favorites => _favorites;
+  List<Affirmation> get voiceAffirmations => _voiceAffirmations;
+  AffirmationSettings get settings => _settings;
+  Affirmation? get dailyAffirmation => _dailyAffirmation;
+  bool get isLoading => _isLoading;
+  bool get isRecording => _isRecording;
+  Duration get recordingDuration => _recordingDuration;
+  String? get error => _error;
+
+  /// Initialize the affirmation state
+  Future<void> initialize() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _loadAll();
+      await _loadDailyAffirmation();
+    } catch (e) {
+      _error = 'Failed to load affirmations: $e';
+      debugPrint(_error);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _loadAll() async {
+    _affirmations = await AffirmationService.loadAffirmations();
+    _favorites = _affirmations.where((a) => a.isFavorite).toList();
+    _voiceAffirmations = _affirmations
+        .where((a) => a.type == AffirmationType.userRecorded)
+        .toList();
+    _settings = await AffirmationService.loadSettings();
+  }
+
+  Future<void> _loadDailyAffirmation() async {
+    _dailyAffirmation = await AffirmationService.getDailyAffirmation();
+  }
+
+  /// Generate a new personalized affirmation
+  Future<Affirmation> generateNewAffirmation({
+    required Map<String, int> moodCounts,
+    String? currentMood,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final affirmation = await AffirmationService.generatePersonalizedAffirmation(
+        moodCounts: moodCounts,
+        currentMood: currentMood,
+      );
+
+      await AffirmationService.saveAffirmation(affirmation);
+      await AffirmationService.saveDailyAffirmation(affirmation);
+      
+      _affirmations.insert(0, affirmation);
+      _dailyAffirmation = affirmation;
+
+      return affirmation;
+    } catch (e) {
+      _error = 'Failed to generate affirmation: $e';
+      debugPrint(_error);
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Generate affirmation for a specific category
+  Future<Affirmation> generateForCategory(AffirmationCategory category) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final affirmation = AffirmationService.getAffirmationForCategory(category);
+      await AffirmationService.saveAffirmation(affirmation);
+      _affirmations.insert(0, affirmation);
+      
+      return affirmation;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Toggle favorite status
+  Future<void> toggleFavorite(Affirmation affirmation) async {
+    final updated = affirmation.copyWith(isFavorite: !affirmation.isFavorite);
+    await AffirmationService.updateAffirmation(updated);
+
+    final index = _affirmations.indexWhere((a) => a.id == affirmation.id);
+    if (index != -1) {
+      _affirmations[index] = updated;
+    }
+
+    _favorites = _affirmations.where((a) => a.isFavorite).toList();
+    
+    if (_dailyAffirmation?.id == affirmation.id) {
+      _dailyAffirmation = updated;
+    }
+
+    notifyListeners();
+  }
+
+  /// Delete an affirmation
+  Future<void> deleteAffirmation(Affirmation affirmation) async {
+    await AffirmationService.deleteAffirmation(affirmation.id);
+    
+    if (affirmation.audioPath != null) {
+      await AudioRecorderService.deleteRecording(affirmation.audioPath!);
+    }
+
+    _affirmations.removeWhere((a) => a.id == affirmation.id);
+    _favorites.removeWhere((a) => a.id == affirmation.id);
+    _voiceAffirmations.removeWhere((a) => a.id == affirmation.id);
+
+    notifyListeners();
+  }
+
+  // Voice Recording Methods
+
+  /// Start recording a new voice affirmation
+  Future<void> startRecording() async {
+    final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+    _currentRecordingPath = await AudioRecorderService.startRecording(tempId);
+    _isRecording = _currentRecordingPath != null;
+    _recordingDuration = Duration.zero;
+    
+    // Start timer for recording duration
+    _recordingTimer?.cancel();
+    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _recordingDuration += const Duration(seconds: 1);
+      notifyListeners();
+    });
+    
+    notifyListeners();
+  }
+
+  /// Stop recording and save the voice affirmation
+  Future<Affirmation?> stopRecordingAndSave({
+    required String text,
+    required AffirmationCategory category,
+  }) async {
+    _recordingTimer?.cancel();
+    final path = await AudioRecorderService.stopRecording();
+    _isRecording = false;
+
+    if (path != null) {
+      final affirmation = Affirmation(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        text: text,
+        type: AffirmationType.userRecorded,
+        category: category,
+        audioPath: path,
+        createdAt: DateTime.now(),
+      );
+
+      await AffirmationService.saveAffirmation(affirmation);
+      _affirmations.insert(0, affirmation);
+      _voiceAffirmations.insert(0, affirmation);
+
+      notifyListeners();
+      return affirmation;
+    }
+
+    notifyListeners();
+    return null;
+  }
+
+  /// Add a custom text affirmation (no recording)
+  Future<void> addCustomAffirmation({
+    required String text,
+    required AffirmationCategory category,
+  }) async {
+    final affirmation = Affirmation(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      text: text,
+      type: AffirmationType.custom,
+      category: category,
+      createdAt: DateTime.now(),
+    );
+
+    await AffirmationService.saveAffirmation(affirmation);
+    _affirmations.insert(0, affirmation);
+    notifyListeners();
+  }
+
+  /// Cancel the current recording
+  Future<void> cancelRecording() async {
+    await AudioRecorderService.cancelRecording();
+    _isRecording = false;
+    _currentRecordingPath = null;
+    notifyListeners();
+  }
+
+  /// Play a voice affirmation
+  Future<void> playAffirmation(String path) async {
+    await AudioRecorderService.playAudio(path);
+    notifyListeners();
+  }
+
+  /// Stop audio playback
+  Future<void> stopPlayback() async {
+    await AudioRecorderService.stopPlayback();
+    notifyListeners();
+  }
+
+  // Settings Methods
+
+  /// Update affirmation settings with optional named parameters
+  Future<void> updateSettings({
+    bool? morningNotifications,
+    bool? eveningNotifications,
+    TimeOfDay? morningTime,
+    TimeOfDay? eveningTime,
+    List<AffirmationCategory>? preferredCategories,
+  }) async {
+    _settings = _settings.copyWith(
+      morningEnabled: morningNotifications,
+      eveningEnabled: eveningNotifications,
+      morningTime: morningTime,
+      eveningTime: eveningTime,
+      preferredCategories: preferredCategories,
+    );
+    await AffirmationService.saveSettings(_settings);
+    notifyListeners();
+  }
+
+  /// Toggle morning notification
+  Future<void> toggleMorningNotification(bool enabled) async {
+    await updateSettings(morningNotifications: enabled);
+  }
+
+  /// Toggle evening notification
+  Future<void> toggleEveningNotification(bool enabled) async {
+    await updateSettings(eveningNotifications: enabled);
+  }
+
+  /// Update morning notification time
+  Future<void> setMorningTime(TimeOfDay time) async {
+    await updateSettings(morningTime: time);
+  }
+
+  /// Update evening notification time
+  Future<void> setEveningTime(TimeOfDay time) async {
+    await updateSettings(eveningTime: time);
+  }
+
+  /// Toggle voice affirmations preference
+  Future<void> toggleVoiceAffirmations(bool enabled) async {
+    _settings = _settings.copyWith(useVoiceAffirmations: enabled);
+    await AffirmationService.saveSettings(_settings);
+    notifyListeners();
+  }
+
+  /// Clear all affirmation data
+  Future<void> clearAllData() async {
+    await AffirmationService.clearAllAffirmations();
+    _affirmations = [];
+    _favorites = [];
+    _voiceAffirmations = [];
+    _dailyAffirmation = null;
+    notifyListeners();
+  }
+
+  /// Refresh affirmations from storage
+  Future<void> refresh() async {
+    await _loadAll();
+    await _loadDailyAffirmation();
+    notifyListeners();
+  }
+}
