@@ -357,6 +357,26 @@ class MusicState extends ChangeNotifier {
     _audioService.cancelSleepTimer();
   }
 
+  /// Stop the alarm sound
+  Future<void> stopAlarm() async {
+    await _audioService.stopAlarm();
+    notifyListeners();
+  }
+
+  /// Check if alarm is currently playing
+  bool get isAlarmPlaying => _audioService.isAlarmPlaying;
+
+  /// Enable or disable alarm when sleep timer completes
+  bool get alarmEnabled => _audioService.alarmEnabled;
+  
+  void setAlarmEnabled(bool enabled) {
+    _audioService.setAlarmEnabled(enabled);
+    notifyListeners();
+  }
+
+  /// Stream for sleep timer completion
+  Stream<void> get sleepTimerCompletedStream => _audioService.sleepTimerCompletedStream;
+
   /// Add a playlist
   Future<void> addPlaylist(Playlist playlist) async {
     try {

@@ -1,10 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart' as just_audio;
 
 import '../models/affirmation.dart';
 import '../services/affirmation_service.dart';
 import '../services/audio_recorder_service.dart';
+import '../services/web_audio_player_web.dart' if (dart.library.io) '../services/web_audio_player.dart';
 
 /// State management for affirmations
 class AffirmationState extends ChangeNotifier {
@@ -16,6 +19,9 @@ class AffirmationState extends ChangeNotifier {
     required this.audioRecorder,
   });
 
+  // Audio player for playback
+  final just_audio.AudioPlayer _audioPlayer = just_audio.AudioPlayer();
+  
   List<Affirmation> _affirmations = [];
   List<Affirmation> _favorites = [];
   List<Affirmation> _voiceAffirmations = [];
@@ -23,6 +29,8 @@ class AffirmationState extends ChangeNotifier {
   Affirmation? _dailyAffirmation;
   bool _isLoading = false;
   bool _isRecording = false;
+  bool _isPlaying = false;
+  String? _currentPlayingPath;
   String? _currentRecordingPath;
   String? _error;
   Duration _recordingDuration = Duration.zero;
@@ -36,6 +44,8 @@ class AffirmationState extends ChangeNotifier {
   Affirmation? get dailyAffirmation => _dailyAffirmation;
   bool get isLoading => _isLoading;
   bool get isRecording => _isRecording;
+  bool get isPlaying => _isPlaying;
+  String? get currentPlayingPath => _currentPlayingPath;
   Duration get recordingDuration => _recordingDuration;
   String? get error => _error;
 
@@ -231,14 +241,98 @@ class AffirmationState extends ChangeNotifier {
 
   /// Play a voice affirmation
   Future<void> playAffirmation(String path) async {
-    await AudioRecorderService.playAudio(path);
-    notifyListeners();
+    debugPrint('AffirmationState: playAffirmation called with path: $path');
+    try {
+      // Stop any currently playing audio
+      if (_isPlaying) {
+        await stopPlayback();
+      }
+      
+      _currentPlayingPath = path;
+      _isPlaying = true;
+      notifyListeners();
+      
+      // Use HTML5 Audio for web blob URLs (just_audio has issues with blob URLs)
+      if (kIsWeb && path.startsWith('blob:')) {
+        debugPrint('AffirmationState: Using WebAudioPlayer for blob URL');
+        await WebAudioPlayer.play(path, onComplete: () {
+          debugPrint('AffirmationState: WebAudioPlayer playback completed');
+          _isPlaying = false;
+          _currentPlayingPath = null;
+          notifyListeners();
+        });
+        debugPrint('AffirmationState: WebAudioPlayer started');
+        return;
+      }
+      
+      // Ensure volume is set
+      await _audioPlayer.setVolume(1.0);
+      
+      // Handle both file paths and http URLs
+      if (path.startsWith('http')) {
+        debugPrint('AffirmationState: Using setUrl for: $path');
+        await _audioPlayer.setUrl(path);
+      } else {
+        debugPrint('AffirmationState: Using setFilePath for: $path');
+        await _audioPlayer.setFilePath(path);
+      }
+      
+      // Get duration to verify audio loaded correctly
+      final duration = _audioPlayer.duration;
+      debugPrint('AffirmationState: Audio duration: $duration');
+      
+      debugPrint('AffirmationState: Audio source set, starting playback...');
+      await _audioPlayer.play();
+      debugPrint('AffirmationState: Playback started, volume: ${_audioPlayer.volume}');
+      
+      // Listen for completion
+      _audioPlayer.playerStateStream.listen((state) {
+        debugPrint('AffirmationState: Player state: ${state.processingState}');
+        if (state.processingState == just_audio.ProcessingState.completed) {
+          _isPlaying = false;
+          _currentPlayingPath = null;
+          notifyListeners();
+        }
+      });
+    } catch (e) {
+      debugPrint('AffirmationState: Error playing audio: $e');
+      _isPlaying = false;
+      _currentPlayingPath = null;
+      notifyListeners();
+    }
   }
 
   /// Stop audio playback
   Future<void> stopPlayback() async {
-    await AudioRecorderService.stopPlayback();
-    notifyListeners();
+    try {
+      // Stop WebAudioPlayer if on web
+      if (kIsWeb) {
+        await WebAudioPlayer.stop();
+      }
+      await _audioPlayer.stop();
+      _isPlaying = false;
+      _currentPlayingPath = null;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('AffirmationState: Error stopping playback: $e');
+    }
+  }
+
+  /// Toggle play/pause for a voice affirmation
+  Future<void> togglePlayback(String path) async {
+    if (_isPlaying && _currentPlayingPath == path) {
+      await stopPlayback();
+    } else {
+      await playAffirmation(path);
+    }
+  }
+
+  /// Dispose resources
+  @override
+  void dispose() {
+    _recordingTimer?.cancel();
+    _audioPlayer.dispose();
+    super.dispose();
   }
 
   // Settings Methods

@@ -385,7 +385,6 @@ class _SurpriseMeTabState extends State<_SurpriseMeTab> {
 
   @override
   Widget build(BuildContext context) {
-    final musicState = context.watch<MusicState>();
     final scheme = Theme.of(context).colorScheme;
 
     return Center(

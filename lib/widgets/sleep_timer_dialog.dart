@@ -6,12 +6,16 @@ class SleepTimerDialog extends StatefulWidget {
   final SleepTimer? currentTimer;
   final ValueChanged<Duration>? onStart;
   final VoidCallback? onCancel;
+  final bool alarmEnabled;
+  final ValueChanged<bool>? onAlarmToggle;
 
   const SleepTimerDialog({
     super.key,
     this.currentTimer,
     this.onStart,
     this.onCancel,
+    this.alarmEnabled = true,
+    this.onAlarmToggle,
   });
 
   @override
@@ -22,6 +26,13 @@ class _SleepTimerDialogState extends State<SleepTimerDialog> {
   Duration? _selectedDuration;
   bool _showCustomPicker = false;
   int _customMinutes = 30;
+  late bool _alarmEnabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _alarmEnabled = widget.alarmEnabled;
+  }
 
   final List<Duration> _presets = [
     const Duration(minutes: 5),
@@ -270,6 +281,76 @@ class _SleepTimerDialogState extends State<SleepTimerDialog> {
                   ],
                 ),
               ],
+
+              const SizedBox(height: 20),
+
+              // Alarm toggle
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _alarmEnabled
+                        ? const Color(0xFFF59E0B).withOpacity(0.5)
+                        : Colors.white.withOpacity(0.1),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _alarmEnabled
+                            ? const Color(0xFFF59E0B).withOpacity(0.2)
+                            : Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.alarm,
+                        color: _alarmEnabled
+                            ? const Color(0xFFF59E0B)
+                            : Colors.white54,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Wake Alarm',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Play alarm when timer ends',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.5),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: _alarmEnabled,
+                      onChanged: (value) {
+                        setState(() => _alarmEnabled = value);
+                        widget.onAlarmToggle?.call(value);
+                      },
+                      activeColor: const Color(0xFFF59E0B),
+                      thumbColor: WidgetStateProperty.all(Colors.white),
+                      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+                    ),
+                  ],
+                ),
+              ),
 
               const SizedBox(height: 24),
 

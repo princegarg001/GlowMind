@@ -4,7 +4,7 @@ import 'dart:math';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:glowmind/models/music_models.dart';
-import 'package:just_audio/just_audio.dart' hide LoopMode;
+import 'package:just_audio/just_audio.dart' as just_audio;
 import 'package:rxdart/rxdart.dart';
 
 /// Service for audio playback, playlist management, and sleep timer
@@ -13,10 +13,12 @@ class AudioService {
   static final AudioService _instance = AudioService._internal();
   factory AudioService() => _instance;
   
-  AudioPlayer? _player; // Recreated as needed for web compatibility
+  just_audio.AudioPlayer? _player; // Recreated as needed for web compatibility
+  just_audio.AudioPlayer? _alarmPlayer; // Separate player for alarm sound
   final Random _random = Random();
   bool _isInitialized = false;
   bool _isDisposed = false;
+  bool _alarmEnabled = true; // Whether to play alarm when timer completes
   
   StreamSubscription? _positionSubscription;
   StreamSubscription? _playerStateSubscription;
@@ -44,6 +46,7 @@ class AudioService {
   final _positionController = StreamController<Duration>.broadcast();
   final _durationController = StreamController<Duration?>.broadcast();
   final _sleepTimerController = StreamController<SleepTimer?>.broadcast();
+  final _sleepTimerCompletedController = StreamController<void>.broadcast();
   final _errorController = StreamController<String>.broadcast();
 
   // Getters
@@ -53,6 +56,7 @@ class AudioService {
   Stream<Duration> get positionStream => _positionController.stream;
   Stream<Duration?> get durationStream => _durationController.stream;
   Stream<SleepTimer?> get sleepTimerStream => _sleepTimerController.stream;
+  Stream<void> get sleepTimerCompletedStream => _sleepTimerCompletedController.stream;
   Stream<String> get errorStream => _errorController.stream;
 
   Playlist? get currentPlaylist => _currentPlaylist;
@@ -65,6 +69,12 @@ class AudioService {
   bool get shuffle => _shuffle;
   LoopMode get loopMode => _loopMode;
   SleepTimer? get sleepTimer => _sleepTimer;
+  bool get alarmEnabled => _alarmEnabled;
+
+  /// Enable or disable alarm sound when sleep timer completes
+  void setAlarmEnabled(bool enabled) {
+    _alarmEnabled = enabled;
+  }
 
   // Private constructor for singleton
   AudioService._internal() {
@@ -110,7 +120,7 @@ class AudioService {
   Future<void> _ensurePlayerExists() async {
     if (_player != null) return;
     
-    _player = AudioPlayer();
+    _player = just_audio.AudioPlayer();
     
     // Listen to player state changes with error handling
     _playerStateSubscription = _player!.playerStateStream.listen(
@@ -120,7 +130,7 @@ class AudioService {
           _isPlayingController.add(state.playing);
           
           // Handle track completion
-          if (state.processingState == ProcessingState.completed) {
+          if (state.processingState == just_audio.ProcessingState.completed) {
             _onTrackCompleted();
           }
         } catch (e) {
@@ -231,16 +241,6 @@ class AudioService {
     } catch (e) {
       debugPrint('AudioService: _loadCurrentTrack error: $e');
       _failedTrackCount++;
-      
-      // Determine error type for better user feedback
-      String errorMsg = 'Unable to load track';
-      if (e.toString().contains('403') || e.toString().contains('Forbidden')) {
-        errorMsg = 'Track access denied. URL may be expired or restricted.';
-      } else if (e.toString().contains('404')) {
-        errorMsg = 'Track not found.';
-      } else if (e.toString().contains('Timeout')) {
-        errorMsg = 'Track loading timed out.';
-      }
       
       // Skip to next track if this one fails, but prevent infinite loop
       if (_failedTrackCount < _maxConsecutiveFailures && 
@@ -505,12 +505,89 @@ class AudioService {
       });
     }
 
-    // Schedule final stop
+    // Schedule final stop and play alarm
     _sleepTimerSubscription = Stream.periodic(Duration.zero).take(1).delay(duration).listen((_) async {
       await stop();
+      _sleepTimerCompletedController.add(null);
+      
+      // Play alarm sound if enabled
+      if (_alarmEnabled) {
+        await _playAlarmSound();
+      }
+      
       cancelSleepTimer();
     });
   }
+
+  /// Play alarm sound when sleep timer completes
+  Future<void> _playAlarmSound() async {
+    try {
+      _alarmPlayer?.dispose();
+      _alarmPlayer = just_audio.AudioPlayer();
+      
+      // Use a gentle alarm sound from online source (soft chime/bell)
+      // This is a free, gentle wake-up tone
+      const alarmUrl = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+      
+      await _alarmPlayer!.setUrl(alarmUrl);
+      await _alarmPlayer!.setVolume(0.7);
+      await _alarmPlayer!.setLoopMode(just_audio.LoopMode.one);
+      await _alarmPlayer!.play();
+      
+      debugPrint('AudioService: Alarm sound started');
+    } catch (e) {
+      debugPrint('AudioService: Failed to play alarm from URL: $e');
+      // Fallback: try local asset
+      try {
+        _alarmPlayer?.dispose();
+        _alarmPlayer = just_audio.AudioPlayer();
+        await _alarmPlayer!.setAsset('assets/audio/alarm.mp3');
+        await _alarmPlayer!.setVolume(0.7);
+        await _alarmPlayer!.setLoopMode(just_audio.LoopMode.one);
+        await _alarmPlayer!.play();
+        debugPrint('AudioService: Playing local alarm asset');
+      } catch (e2) {
+        debugPrint('AudioService: Local alarm also failed: $e2');
+        // Last resort: try any existing mood audio
+        try {
+          _alarmPlayer?.dispose();
+          _alarmPlayer = just_audio.AudioPlayer();
+          final existingAssets = [
+            'assets/audio/nature/birds_morning.mp3',
+            'assets/audio/meditate/tibetan_bowls.mp3',
+          ];
+          for (final asset in existingAssets) {
+            try {
+              await _alarmPlayer!.setAsset(asset);
+              await _alarmPlayer!.setVolume(0.5);
+              await _alarmPlayer!.play();
+              debugPrint('AudioService: Playing fallback alarm: $asset');
+              break;
+            } catch (_) {
+              continue;
+            }
+          }
+        } catch (e3) {
+          debugPrint('AudioService: All alarm options failed: $e3');
+        }
+      }
+    }
+  }
+
+  /// Stop the alarm sound
+  Future<void> stopAlarm() async {
+    try {
+      await _alarmPlayer?.stop();
+      _alarmPlayer?.dispose();
+      _alarmPlayer = null;
+      debugPrint('AudioService: Alarm stopped');
+    } catch (e) {
+      debugPrint('AudioService: Error stopping alarm: $e');
+    }
+  }
+
+  /// Check if alarm is currently playing
+  bool get isAlarmPlaying => _alarmPlayer?.playing ?? false;
 
   /// Start fade out effect
   void _startFadeOut(Duration duration) {

@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:glowmind/models/music_models.dart';
 import 'package:glowmind/nav.dart';
 import 'package:glowmind/state/music_state.dart';
+import 'package:glowmind/widgets/alarm_overlay.dart';
 import 'package:glowmind/widgets/interactive_glow_background.dart';
 import 'package:glowmind/widgets/minimalist_music_controls.dart';
 import 'package:glowmind/widgets/orbs/mood_orb_selector.dart';
@@ -26,7 +29,9 @@ class _VerticalMoodNavigatorState extends State<VerticalMoodNavigator> {
   int _scrollingToMoodIndex = 0; // Next mood during scroll
   double _lastVolume = 0.7;
   bool _showWelcome = true;
+  bool _showAlarmOverlay = false;
   double _scrollProgress = 0.0; // 0.0 to 1.0 for gradient blending
+  StreamSubscription? _alarmSubscription;
   
   // All moods in order
   final List<MoodType> _moods = [
@@ -51,7 +56,23 @@ class _VerticalMoodNavigatorState extends State<VerticalMoodNavigator> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadLastMood();
+      _setupAlarmListener();
     });
+  }
+
+  void _setupAlarmListener() {
+    final musicState = context.read<MusicState>();
+    _alarmSubscription = musicState.sleepTimerCompletedStream.listen((_) {
+      if (musicState.alarmEnabled && mounted) {
+        setState(() => _showAlarmOverlay = true);
+      }
+    });
+  }
+
+  void _dismissAlarm() {
+    final musicState = context.read<MusicState>();
+    musicState.stopAlarm();
+    setState(() => _showAlarmOverlay = false);
   }
 
   void _onScroll() {
@@ -97,6 +118,7 @@ class _VerticalMoodNavigatorState extends State<VerticalMoodNavigator> {
 
   @override
   void dispose() {
+    _alarmSubscription?.cancel();
     _pageController.removeListener(_onScroll);
     _pageController.dispose();
     super.dispose();
@@ -123,8 +145,10 @@ class _VerticalMoodNavigatorState extends State<VerticalMoodNavigator> {
       context: context,
       builder: (context) => SleepTimerDialog(
         currentTimer: musicState.sleepTimer,
+        alarmEnabled: musicState.alarmEnabled,
         onStart: (duration) => musicState.startSleepTimer(duration),
         onCancel: () => musicState.cancelSleepTimer(),
+        onAlarmToggle: (enabled) => musicState.setAlarmEnabled(enabled),
       ),
     );
   }
@@ -324,6 +348,10 @@ class _VerticalMoodNavigatorState extends State<VerticalMoodNavigator> {
           // Welcome overlay on first paint
           if (_showWelcome)
             WelcomeOverlay(onComplete: _dismissWelcome),
+
+          // Alarm overlay when sleep timer completes
+          if (_showAlarmOverlay)
+            AlarmOverlay(onDismiss: _dismissAlarm),
         ],
       ),
     );

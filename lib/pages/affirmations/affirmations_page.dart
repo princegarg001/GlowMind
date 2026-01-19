@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../models/affirmation.dart';
 import '../../state/affirmation_state.dart';
@@ -787,6 +790,9 @@ class _AffirmationsPageState extends State<AffirmationsPage>
   }
 
   Widget _buildVoiceItem(Affirmation affirmation, AffirmationState state) {
+    final isCurrentlyPlaying = state.isPlaying && 
+        state.currentPlayingPath == affirmation.audioPath;
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(18),
@@ -799,8 +805,19 @@ class _AffirmationsPageState extends State<AffirmationsPage>
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+          color: isCurrentlyPlaying
+              ? const Color(0xFFEC4899).withValues(alpha: 0.5)
+              : const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+          width: isCurrentlyPlaying ? 2 : 1,
         ),
+        boxShadow: isCurrentlyPlaying
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFEC4899).withValues(alpha: 0.2),
+                  blurRadius: 15,
+                ),
+              ]
+            : null,
       ),
       child: Row(
         children: [
@@ -808,25 +825,35 @@ class _AffirmationsPageState extends State<AffirmationsPage>
             onTap: () {
               if (affirmation.audioPath != null) {
                 HapticFeedback.lightImpact();
-                state.playAffirmation(affirmation.audioPath!);
+                state.togglePlayback(affirmation.audioPath!);
               }
             },
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
+                gradient: LinearGradient(
+                  colors: isCurrentlyPlaying
+                      ? [const Color(0xFFEC4899), const Color(0xFFEF4444)]
+                      : [const Color(0xFF7C3AED), const Color(0xFF4F46E5)],
                 ),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+                    color: (isCurrentlyPlaying
+                            ? const Color(0xFFEC4899)
+                            : const Color(0xFF8B5CF6))
+                        .withValues(alpha: 0.4),
                     blurRadius: 12,
                   ),
                 ],
               ),
-              child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 28),
+              child: Icon(
+                isCurrentlyPlaying ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -860,9 +887,50 @@ class _AffirmationsPageState extends State<AffirmationsPage>
                         fontSize: 12,
                       ),
                     ),
+                    if (isCurrentlyPlaying) ...[
+                      const SizedBox(width: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEC4899).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.graphic_eq_rounded,
+                              color: Color(0xFFEC4899),
+                              size: 12,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              "Playing",
+                              style: TextStyle(
+                                color: Color(0xFFEC4899),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],
+            ),
+          ),
+          // Share button
+          IconButton(
+            onPressed: () => _shareAffirmation(affirmation),
+            icon: Icon(
+              Icons.share_rounded,
+              color: Colors.white.withValues(alpha: 0.5),
+              size: 20,
             ),
           ),
           IconButton(
@@ -997,13 +1065,86 @@ class _AffirmationsPageState extends State<AffirmationsPage>
 
   void _shareAffirmation(Affirmation affirmation) {
     HapticFeedback.lightImpact();
-    // Implement share functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Share feature coming soon!"),
-        duration: Duration(seconds: 2),
+    
+    // Show share options dialog
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _ShareOptionsSheet(
+        affirmation: affirmation,
+        onShareText: () => _shareAsText(affirmation),
+        onShareWithAudio: affirmation.audioPath != null
+            ? () => _shareWithAudio(affirmation)
+            : null,
       ),
     );
+  }
+
+  Future<void> _shareAsText(Affirmation affirmation) async {
+    Navigator.pop(context); // Close bottom sheet
+    
+    final shareText = '''✨ "${affirmation.text}"
+
+🌟 Category: ${affirmation.category.displayName}
+
+— Shared from GlowMind 💜''';
+
+    try {
+      await Share.share(
+        shareText,
+        subject: 'My Affirmation from GlowMind',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unable to share: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _shareWithAudio(Affirmation affirmation) async {
+    Navigator.pop(context); // Close bottom sheet
+    
+    if (affirmation.audioPath == null) return;
+
+    final shareText = '''✨ "${affirmation.text}"
+
+🌟 Category: ${affirmation.category.displayName}
+🎙️ Listen to my voice affirmation!
+
+— Shared from GlowMind 💜''';
+
+    try {
+      if (!kIsWeb) {
+        final file = File(affirmation.audioPath!);
+        if (await file.exists()) {
+          await Share.shareXFiles(
+            [XFile(affirmation.audioPath!)],
+            text: shareText,
+            subject: 'My Voice Affirmation from GlowMind',
+          );
+        } else {
+          // File doesn't exist, share text only
+          await _shareAsText(affirmation);
+        }
+      } else {
+        // Web platform - share text only
+        await Share.share(shareText, subject: 'My Affirmation from GlowMind');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unable to share: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 
   void _showAffirmationSnackbar(Affirmation affirmation) {
@@ -1066,5 +1207,188 @@ class _AffirmationsPageState extends State<AffirmationsPage>
     if (diff.inDays == 1) return "Yesterday";
     if (diff.inDays < 7) return "${diff.inDays} days ago";
     return "${date.day}/${date.month}";
+  }
+}
+
+/// Bottom sheet for share options
+class _ShareOptionsSheet extends StatelessWidget {
+  final Affirmation affirmation;
+  final VoidCallback onShareText;
+  final VoidCallback? onShareWithAudio;
+
+  const _ShareOptionsSheet({
+    required this.affirmation,
+    required this.onShareText,
+    this.onShareWithAudio,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF1F1635), Color(0xFF140F28)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 20),
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          
+          // Title
+          const Text(
+            "Share Affirmation",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '"${affirmation.text}"',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.6),
+              fontSize: 14,
+              fontStyle: FontStyle.italic,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 28),
+          
+          // Share as text option
+          _ShareOption(
+            icon: Icons.text_fields_rounded,
+            title: "Share as Text",
+            subtitle: "Share the affirmation text",
+            color: const Color(0xFF8B5CF6),
+            onTap: onShareText,
+          ),
+          const SizedBox(height: 12),
+          
+          // Share with audio option (only if audio exists)
+          _ShareOption(
+            icon: Icons.mic_rounded,
+            title: "Share with Audio",
+            subtitle: onShareWithAudio != null
+                ? "Include your voice recording"
+                : "Record this affirmation first",
+            color: const Color(0xFFEC4899),
+            onTap: onShareWithAudio,
+            enabled: onShareWithAudio != null,
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Cancel button
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              "Cancel",
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 16,
+              ),
+            ),
+          ),
+          SizedBox(height: MediaQuery.of(context).padding.bottom),
+        ],
+      ),
+    );
+  }
+}
+
+class _ShareOption extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback? onTap;
+  final bool enabled;
+
+  const _ShareOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    this.onTap,
+    this.enabled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 200),
+        opacity: enabled ? 1.0 : 0.4,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: color.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: Colors.white.withValues(alpha: 0.3),
+                size: 18,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
