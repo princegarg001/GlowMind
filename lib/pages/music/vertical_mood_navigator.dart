@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:glowmind/models/music_models.dart';
 import 'package:glowmind/nav.dart';
 import 'package:glowmind/state/music_state.dart';
@@ -61,23 +60,20 @@ class _VerticalMoodNavigatorState extends State<VerticalMoodNavigator> {
     final pageFloor = page.floor();
     final progress = page - pageFloor;
     
-    // Determine which mood we're scrolling towards
-    final currentIndex = pageFloor % _moods.length;
+    // Determine which mood index based on scroll position
+    // Use round() to snap to the nearest mood when past 50% scroll
+    final roundedPage = page.round();
+    final displayMoodIndex = roundedPage % _moods.length;
     final nextIndex = (pageFloor + 1) % _moods.length;
     
-    // Only update state if values actually changed (optimization)
+    // Update immediately for responsive UI
     if (_scrollProgress != progress || 
-        _currentMoodIndex != currentIndex ||
+        _currentMoodIndex != displayMoodIndex ||
         _scrollingToMoodIndex != nextIndex) {
-      // Use addPostFrameCallback for smoother updates
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          setState(() {
-            _scrollProgress = progress;
-            _currentMoodIndex = currentIndex;
-            _scrollingToMoodIndex = nextIndex;
-          });
-        }
+      setState(() {
+        _scrollProgress = progress;
+        _currentMoodIndex = displayMoodIndex;
+        _scrollingToMoodIndex = nextIndex;
       });
     }
   }
