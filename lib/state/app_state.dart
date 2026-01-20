@@ -25,7 +25,8 @@ class AppState extends ChangeNotifier {
   AppUser? _user;
   List<NoteEntry> _notes = const [];
   SleepProfile? _sleep;
-  GlowState _glow = const GlowState(intensity: 0.5, pulse: 0.2, mood: GlowMood.balanced);
+  GlowState _glow =
+      const GlowState(intensity: 0.5, pulse: 0.2, mood: GlowMood.balanced);
   bool _isLoading = false;
 
   AuthStatus get authStatus => _authStatus;
@@ -45,7 +46,7 @@ class AppState extends ChangeNotifier {
         _onSignOut();
       }
     });
-    
+
     final currentUser = SupabaseConfig.auth.currentUser;
     if (currentUser != null) {
       await _onAuthChanged(currentUser);
@@ -59,19 +60,28 @@ class AppState extends ChangeNotifier {
       notifyListeners();
 
       _authStatus = AuthStatus.signedIn;
-      _user = await _dataService.loadUser(supabaseUser.id);
-      debugPrint('AppState: User loaded: ${_user != null}');
-      
+
+      // Try to load user from database, retry a few times for new users
+      AppUser? loadedUser;
+      for (int i = 0; i < 3; i++) {
+        loadedUser = await _dataService.loadUser(supabaseUser.id);
+        if (loadedUser != null) break;
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      _user = loadedUser;
+      debugPrint(
+          'AppState: User loaded: ${_user != null}, name: ${_user?.name}');
+
       // Initialize music even if user data fails to load
       final userId = _user?.id ?? supabaseUser.id;
-      
+
       if (_user != null) {
         // Load user data in background (non-blocking)
         loadUserData().catchError((e) {
           debugPrint('AppState: loadUserData failed: $e');
         });
       }
-      
+
       // Initialize music state for user in background (non-blocking)
       if (_musicState != null) {
         debugPrint('AppState: Initializing music for user: $userId');
@@ -94,13 +104,41 @@ class AppState extends ChangeNotifier {
     _user = null;
     _notes = const [];
     _sleep = null;
-    _glow = const GlowState(intensity: 0.5, pulse: 0.2, mood: GlowMood.balanced);
+    _glow =
+        const GlowState(intensity: 0.5, pulse: 0.2, mood: GlowMood.balanced);
     notifyListeners();
+  }
+
+  /// Set the current user directly (used after sign up/sign in)
+  void setUser(AppUser user) {
+    _user = user;
+    _authStatus = AuthStatus.signedIn;
+    notifyListeners();
+
+    // Initialize music for user in background
+    if (_musicState != null) {
+      debugPrint('AppState: Initializing music for user: ${user.id}');
+      _musicState.initForUser(user.id).catchError((e) {
+        debugPrint('AppState: Music initialization failed: $e');
+      });
+    }
+  }
+
+  /// Refresh user data from database
+  Future<void> refreshUser() async {
+    final currentUser = SupabaseConfig.auth.currentUser;
+    if (currentUser == null) return;
+
+    final loadedUser = await _dataService.loadUser(currentUser.id);
+    if (loadedUser != null) {
+      _user = loadedUser;
+      notifyListeners();
+    }
   }
 
   Future<void> loadUserData() async {
     if (_user == null) return;
-    
+
     try {
       _notes = await _dataService.loadNotes(_user!.id);
       _sleep = await _dataService.loadSleepProfile(_user!.id);
@@ -116,7 +154,7 @@ class AppState extends ChangeNotifier {
     _authStatus = AuthStatus.guest;
     _user = const AppUser(id: 'guest', isGuest: true);
     notifyListeners();
-    
+
     // Initialize music for guest user in background (don't wait for it)
     if (_musicState != null) {
       debugPrint('AppState: Initializing music for guest user');
@@ -139,7 +177,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> addNote(String text) async {
     if (_user == null) return;
-    
+
     try {
       final note = await _dataService.addNote(_user!.id, text);
       if (note != null) {
@@ -165,11 +203,13 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> setSleepProfile(TimeOfDaySimple bedtime, TimeOfDaySimple wakeTime) async {
+  Future<void> setSleepProfile(
+      TimeOfDaySimple bedtime, TimeOfDaySimple wakeTime) async {
     if (_user == null) return;
-    
+
     try {
-      final profile = await _dataService.saveSleepProfile(_user!.id, bedtime, wakeTime);
+      final profile =
+          await _dataService.saveSleepProfile(_user!.id, bedtime, wakeTime);
       if (profile != null) {
         _sleep = profile;
         _recomputeGlow();

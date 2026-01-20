@@ -9,20 +9,53 @@ import 'package:provider/provider.dart';
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
+  String _getInitials(String? name, String? email) {
+    if (name != null && name.isNotEmpty) {
+      final parts = name.trim().split(' ');
+      if (parts.length >= 2) {
+        return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+      }
+      return name[0].toUpperCase();
+    }
+    if (email != null && email.isNotEmpty) {
+      return email[0].toUpperCase();
+    }
+    return 'G'; // Guest
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final app = context.watch<AppState>();
     return Scaffold(
-      appBar: AppBar(title: Text('Settings', style: Theme.of(context).textTheme.titleLarge?.withColor(scheme.onSurface))),
+      appBar: AppBar(
+          title: Text('Settings',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.withColor(scheme.onSurface))),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
           Card(
             child: ListTile(
-              leading: Icon(Icons.person_outline, color: scheme.onSurface),
-              title: Text(app.user?.isGuest == true ? 'Guest user' : 'Signed in'),
-              subtitle: Text(app.user?.email ?? 'No email'),
+              leading: CircleAvatar(
+                backgroundColor: scheme.primary.withOpacity(0.2),
+                child: Text(
+                  _getInitials(app.user?.name, app.user?.email),
+                  style: TextStyle(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              title: Text(
+                app.user?.name ??
+                    (app.user?.isGuest == true ? 'Guest User' : 'User'),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(app.user?.email ??
+                  (app.user?.isGuest == true ? 'No account' : 'No email')),
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -38,7 +71,7 @@ class SettingsPage extends StatelessWidget {
               title: const Text('Sign out'),
               onTap: () async {
                 await context.read<AppState>().signOut();
-                if (context.mounted) context.go(AppRoutes.auth);
+                if (context.mounted) context.go(AppRoutes.signIn);
               },
             ),
           ),
@@ -124,7 +157,8 @@ class _ServiceTestTileState extends State<ServiceTestTile> {
                   boxShadow: _success != null
                       ? [
                           BoxShadow(
-                            color: (_success! ? Colors.green : Colors.red).withOpacity(0.4),
+                            color: (_success! ? Colors.green : Colors.red)
+                                .withOpacity(0.4),
                             blurRadius: 6,
                             spreadRadius: 2,
                           )

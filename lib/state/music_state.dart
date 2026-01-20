@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:glowmind/models/music_models.dart';
 import 'package:glowmind/services/audio_service.dart';
+import 'package:glowmind/services/insights_service.dart';
 import 'package:glowmind/services/local_store.dart';
 import 'package:glowmind/services/music_storage.dart';
 
@@ -10,6 +11,7 @@ import 'package:glowmind/services/music_storage.dart';
 class MusicState extends ChangeNotifier {
   final AudioService _audioService;
   final MusicStorage _storage;
+  final InsightsService _insightsService = InsightsService();
 
   // Current state
   MoodType _currentMood = MoodType.sleep;
@@ -26,9 +28,8 @@ class MusicState extends ChangeNotifier {
   bool _isLoading = false;
   String? _userId;
   String? _lastError;
-  
+
   // Mood history tracking
-  final LocalStore _localStore = LocalStore();
   DateTime? _moodStartTime;
   List<MoodHistoryEntry> _moodHistory = [];
 
@@ -99,7 +100,7 @@ class MusicState extends ChangeNotifier {
       _sleepTimer = timer;
       notifyListeners();
     });
-    
+
     // Subscribe to error stream
     _errorSub = _audioService.errorStream.listen((error) {
       _lastError = error;
@@ -113,7 +114,7 @@ class MusicState extends ChangeNotifier {
       });
     });
   }
-  
+
   /// Clear current error
   void clearError() {
     _lastError = null;
@@ -127,14 +128,20 @@ class MusicState extends ChangeNotifier {
       _isLoading = true;
       _userId = userId;
       notifyListeners();
-      
-      // Load mood history
-      _moodHistory = await _localStore.loadMoodHistory();
+
+      // Initialize insights service for this user
+      await _insightsService.initForUser(userId);
+
+      // Load mood history for this user
+      _moodHistory = await _insightsService.loadMoodHistory();
+      debugPrint(
+          'MusicState: Loaded ${_moodHistory.length} mood history entries');
 
       // Load preferences from local storage first
       _preferences = await _storage.loadLocalPreferences(userId);
-      debugPrint('MusicState: Local preferences loaded: ${_preferences != null}');
-      
+      debugPrint(
+          'MusicState: Local preferences loaded: ${_preferences != null}');
+
       // Try to load from Supabase (but don't fail if unavailable)
       try {
         final supabasePrefs = await _storage.loadSupabasePreferences(userId);
@@ -146,7 +153,7 @@ class MusicState extends ChangeNotifier {
       } catch (e) {
         debugPrint('MusicState: Supabase preferences not available: $e');
       }
-      
+
       // Create default preferences if none exist (with autoPlay enabled)
       if (_preferences == null) {
         _preferences = UserMusicPreferences(
@@ -155,7 +162,8 @@ class MusicState extends ChangeNotifier {
           volume: 0.7,
         );
         await _storage.saveLocalPreferences(_preferences!);
-        debugPrint('MusicState: Created default preferences with autoPlay=true');
+        debugPrint(
+            'MusicState: Created default preferences with autoPlay=true');
       }
 
       // Apply preferences
@@ -165,13 +173,13 @@ class MusicState extends ChangeNotifier {
       await _audioService.setVolume(_volume);
       _audioService.setShuffle(_shuffle);
       _audioService.setLoopMode(_loopMode);
-      debugPrint('MusicState: Applied preferences - volume: $_volume, autoPlay: ${_preferences!.autoPlay}');
+      debugPrint(
+          'MusicState: Applied preferences - volume: $_volume, autoPlay: ${_preferences!.autoPlay}');
 
       // Load last mood or default to sleep
       final targetMood = _preferences!.lastMood ?? MoodType.sleep;
       debugPrint('MusicState: Loading mood: ${targetMood.name}');
       await changeMood(targetMood, forceAutoPlay: true);
-      
     } catch (e) {
       debugPrint('MusicState: initForUser error: $e');
     } finally {
@@ -182,22 +190,24 @@ class MusicState extends ChangeNotifier {
 
   /// Change current mood
   /// Set skipAutoPlay=true to load playlist without starting playback
-  Future<void> changeMood(MoodType mood, {bool forceAutoPlay = false, bool skipAutoPlay = false}) async {
+  Future<void> changeMood(MoodType mood,
+      {bool forceAutoPlay = false, bool skipAutoPlay = false}) async {
     try {
-      debugPrint('MusicState: Changing mood to ${mood.name}, forceAutoPlay: $forceAutoPlay, skipAutoPlay: $skipAutoPlay');
-      
+      debugPrint(
+          'MusicState: Changing mood to ${mood.name}, forceAutoPlay: $forceAutoPlay, skipAutoPlay: $skipAutoPlay');
+
       // Track mood history - save duration of previous mood
       await _saveMoodDuration();
       _moodStartTime = DateTime.now();
-      
-      // Save new mood entry
+
+      // Save new mood entry using InsightsService
       final entry = MoodHistoryEntry(
         mood: mood.name,
         timestamp: _moodStartTime!,
       );
-      await _localStore.saveMoodEntry(entry);
-      _moodHistory = await _localStore.loadMoodHistory();
-      
+      await _insightsService.saveMoodEntry(entry);
+      _moodHistory = await _insightsService.loadMoodHistory();
+
       _currentMood = mood;
       notifyListeners();
 
@@ -215,29 +225,32 @@ class MusicState extends ChangeNotifier {
 
       // Load playlists for this mood
       await _loadMoodPlaylists(mood);
-      debugPrint('MusicState: Playlists loaded: ${_playlistsCache[mood]?.length ?? 0}');
+      debugPrint(
+          'MusicState: Playlists loaded: ${_playlistsCache[mood]?.length ?? 0}');
 
       // Load default or last played playlist
       if (_playlistsCache[mood]?.isNotEmpty == true) {
-        final defaultPlaylist = _playlistsCache[mood]!
-            .firstWhere((p) => p.isDefault, orElse: () => _playlistsCache[mood]!.first);
-        
-        debugPrint('MusicState: Loading playlist "${defaultPlaylist.name}" with ${defaultPlaylist.tracks.length} tracks');
-        
+        final defaultPlaylist = _playlistsCache[mood]!.firstWhere(
+            (p) => p.isDefault,
+            orElse: () => _playlistsCache[mood]!.first);
+
+        debugPrint(
+            'MusicState: Loading playlist "${defaultPlaylist.name}" with ${defaultPlaylist.tracks.length} tracks');
+
         if (defaultPlaylist.tracks.isEmpty) {
           debugPrint('MusicState: Warning - playlist has no tracks!');
           return;
         }
 
         await _audioService.loadPlaylist(defaultPlaylist);
-        
+
         // Auto-play logic:
         // 1. Skip if skipAutoPlay=true (explicit no-play request)
         // 2. Always play if forceAutoPlay=true (initial load)
         // 3. Always play when manually changing moods (mood swipe)
         final shouldAutoPlay = !skipAutoPlay;
         debugPrint('MusicState: Should auto-play: $shouldAutoPlay');
-        
+
         if (shouldAutoPlay) {
           debugPrint('MusicState: Starting playback...');
           await _audioService.play();
@@ -253,7 +266,7 @@ class MusicState extends ChangeNotifier {
   /// Load playlists for a specific mood
   Future<void> _loadMoodPlaylists(MoodType mood) async {
     if (_userId == null) return;
-    
+
     try {
       if (!_playlistsCache.containsKey(mood)) {
         final playlists = await _storage.loadPlaylists(_userId!, mood);
@@ -303,7 +316,7 @@ class MusicState extends ChangeNotifier {
   Future<void> setVolume(double volume) async {
     _volume = volume;
     await _audioService.setVolume(volume);
-    
+
     // Save to preferences (fire and forget)
     if (_userId != null && _preferences != null) {
       _preferences = _preferences!.copyWith(volume: volume);
@@ -311,7 +324,7 @@ class MusicState extends ChangeNotifier {
       // Async save to Supabase (don't await, use unawaited pattern)
       unawaited(_storage.saveSupabasePreferences(_preferences!));
     }
-    
+
     notifyListeners();
   }
 
@@ -319,7 +332,7 @@ class MusicState extends ChangeNotifier {
   void toggleShuffle() {
     _shuffle = !_shuffle;
     _audioService.setShuffle(_shuffle);
-    
+
     // Save to preferences (fire and forget)
     if (_userId != null && _preferences != null) {
       _preferences = _preferences!.copyWith(shuffle: _shuffle);
@@ -327,7 +340,7 @@ class MusicState extends ChangeNotifier {
       // Async save to Supabase (don't await, use unawaited pattern)
       unawaited(_storage.saveSupabasePreferences(_preferences!));
     }
-    
+
     notifyListeners();
   }
 
@@ -335,7 +348,7 @@ class MusicState extends ChangeNotifier {
   void cycleLoopMode() {
     _audioService.cycleLoopMode();
     _loopMode = _audioService.loopMode;
-    
+
     // Save to preferences (fire and forget)
     if (_userId != null && _preferences != null) {
       _preferences = _preferences!.copyWith(loopMode: _loopMode);
@@ -343,7 +356,7 @@ class MusicState extends ChangeNotifier {
       // Async save to Supabase (don't await, use unawaited pattern)
       unawaited(_storage.saveSupabasePreferences(_preferences!));
     }
-    
+
     notifyListeners();
   }
 
@@ -368,14 +381,15 @@ class MusicState extends ChangeNotifier {
 
   /// Enable or disable alarm when sleep timer completes
   bool get alarmEnabled => _audioService.alarmEnabled;
-  
+
   void setAlarmEnabled(bool enabled) {
     _audioService.setAlarmEnabled(enabled);
     notifyListeners();
   }
 
   /// Stream for sleep timer completion
-  Stream<void> get sleepTimerCompletedStream => _audioService.sleepTimerCompletedStream;
+  Stream<void> get sleepTimerCompletedStream =>
+      _audioService.sleepTimerCompletedStream;
 
   /// Add a playlist
   Future<void> addPlaylist(Playlist playlist) async {
@@ -415,20 +429,19 @@ class MusicState extends ChangeNotifier {
   Future<void> deletePlaylist(String playlistId) async {
     try {
       await _storage.deletePlaylist(playlistId);
-      
+
       // Remove from cache
       for (final mood in _playlistsCache.keys) {
-        _playlistsCache[mood] = _playlistsCache[mood]!
-            .where((p) => p.id != playlistId)
-            .toList();
+        _playlistsCache[mood] =
+            _playlistsCache[mood]!.where((p) => p.id != playlistId).toList();
       }
-      
+
       notifyListeners();
     } catch (e) {
       debugPrint('deletePlaylist error: $e');
     }
   }
-  
+
   /// Refresh playlists for a specific mood (clears cache and reloads)
   Future<void> refreshPlaylists(MoodType mood) async {
     _playlistsCache.remove(mood);
@@ -441,31 +454,51 @@ class MusicState extends ChangeNotifier {
     if (_moodStartTime != null && _moodHistory.isNotEmpty) {
       final duration = DateTime.now().difference(_moodStartTime!).inSeconds;
       if (duration > 0) {
-        // Update the last entry with duration
-        final lastEntry = _moodHistory.last;
-        final updatedEntry = MoodHistoryEntry(
-          mood: lastEntry.mood,
-          timestamp: lastEntry.timestamp,
-          durationSeconds: duration,
-        );
-        _moodHistory[_moodHistory.length - 1] = updatedEntry;
+        // Update the last entry with duration using InsightsService
+        await _insightsService.updateLastMoodDuration(duration);
+        // Refresh local cache
+        _moodHistory = await _insightsService.loadMoodHistory();
       }
     }
   }
 
-  /// Load mood history from local storage
+  /// Load mood history from insights service
   Future<void> loadMoodHistory() async {
-    _moodHistory = await _localStore.loadMoodHistory();
+    _moodHistory = await _insightsService.loadMoodHistory();
+    notifyListeners();
+  }
+
+  /// Get current streak
+  Future<int> getCurrentStreak() async {
+    return await _insightsService.getCurrentStreak();
+  }
+
+  /// Get most used mood
+  Future<String?> getMostUsedMood({int? daysBack}) async {
+    return await _insightsService.getMostUsedMood(daysBack: daysBack);
+  }
+
+  /// Get mood durations in seconds
+  Future<Map<String, int>> getMoodDurations({int? daysBack}) async {
+    final durations =
+        await _insightsService.getMoodDurations(daysBack: daysBack);
+    // Convert Duration to seconds (int) for UI
+    return durations.map((key, value) => MapEntry(key, value.inSeconds));
+  }
+
+  /// Clear mood history
+  Future<void> clearMoodHistory() async {
+    await _insightsService.clearMoodHistory();
+    _moodHistory = [];
     notifyListeners();
   }
 
   /// Get mood statistics for insights
   Map<String, int> getMoodCounts({int? daysBack}) {
     final now = DateTime.now();
-    final cutoff = daysBack != null 
-        ? now.subtract(Duration(days: daysBack))
-        : null;
-    
+    final cutoff =
+        daysBack != null ? now.subtract(Duration(days: daysBack)) : null;
+
     final counts = <String, int>{};
     for (final entry in _moodHistory) {
       if (cutoff != null && entry.timestamp.isBefore(cutoff)) continue;
@@ -478,14 +511,15 @@ class MusicState extends ChangeNotifier {
   List<Map<String, dynamic>> getMoodTrend({int days = 7}) {
     final now = DateTime.now();
     final result = <Map<String, dynamic>>[];
-    
+
     for (int i = days - 1; i >= 0; i--) {
       final date = DateTime(now.year, now.month, now.day - i);
       final nextDate = date.add(const Duration(days: 1));
-      
+
       int count = 0;
       for (final entry in _moodHistory) {
-        if (entry.timestamp.isAfter(date) && entry.timestamp.isBefore(nextDate)) {
+        if (entry.timestamp.isAfter(date) &&
+            entry.timestamp.isBefore(nextDate)) {
           count++;
         }
       }

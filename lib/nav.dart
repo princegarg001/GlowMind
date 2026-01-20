@@ -1,5 +1,7 @@
 import 'package:glowmind/pages/Insights/insightspage.dart';
 import 'package:glowmind/pages/affirmations/affirmations_page.dart';
+import 'package:glowmind/pages/auth/sign_in_page.dart';
+import 'package:glowmind/pages/auth/sign_up_page.dart';
 import 'package:glowmind/pages/auth_page.dart';
 import 'package:glowmind/pages/home/glow_home_page.dart';
 import 'package:glowmind/pages/music/playlist_manager_page.dart';
@@ -25,6 +27,18 @@ class AppRouter {
         name: 'auth',
         pageBuilder: (context, state) =>
             const NoTransitionPage(child: AuthPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.signUp,
+        name: 'signUp',
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: SignUpPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.signIn,
+        name: 'signIn',
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: SignInPage()),
       ),
       GoRoute(
         path: AppRoutes.home,
@@ -76,6 +90,8 @@ class AppRouter {
 class AppRoutes {
   static const String splash = '/';
   static const String auth = '/auth';
+  static const String signUp = '/sign-up';
+  static const String signIn = '/sign-in';
   static const String home = '/home';
   static const String originalHome = '/original-home';
   static const String notes = '/notes';

@@ -33,7 +33,8 @@ class LocalStore {
     try {
       final raw = _prefs?.getString(_kAuth);
       if (raw == null) return AuthStatus.signedOut;
-      return AuthStatus.values.firstWhere((e) => e.name == raw, orElse: () => AuthStatus.signedOut);
+      return AuthStatus.values
+          .firstWhere((e) => e.name == raw, orElse: () => AuthStatus.signedOut);
     } catch (e) {
       debugPrint('loadAuthStatus error: $e');
       return AuthStatus.signedOut;
@@ -55,7 +56,10 @@ class LocalStore {
       final raw = _prefs?.getString(_kUser);
       if (raw == null) return null;
       final map = jsonDecode(raw) as Map<String, dynamic>;
-      return AppUser(id: map['id'] as String, email: map['email'] as String?, isGuest: map['isGuest'] as bool? ?? false);
+      return AppUser(
+          id: map['id'] as String,
+          email: map['email'] as String?,
+          isGuest: map['isGuest'] as bool? ?? false);
     } catch (e) {
       debugPrint('loadUser error: $e');
       return null;
@@ -133,7 +137,7 @@ class LocalStore {
     }
   }
 
-  /// Load mood history entries
+  /// Load mood history entries (legacy - use loadMoodHistoryForUser instead)
   Future<List<MoodHistoryEntry>> loadMoodHistory() async {
     await _ensure();
     try {
@@ -147,15 +151,15 @@ class LocalStore {
     }
   }
 
-  /// Save a mood entry to history
+  /// Save a mood entry to history (legacy - use saveMoodEntryForUser instead)
   Future<void> saveMoodEntry(MoodHistoryEntry entry) async {
     await _ensure();
     try {
       final history = await loadMoodHistory();
       history.add(entry);
       // Keep only the last 1000 entries to prevent excessive storage
-      final trimmed = history.length > 1000 
-          ? history.sublist(history.length - 1000) 
+      final trimmed = history.length > 1000
+          ? history.sublist(history.length - 1000)
           : history;
       final list = trimmed.map((e) => e.toJson()).toList();
       await _prefs?.setString(_kMoodHistory, jsonEncode(list));
@@ -164,13 +168,127 @@ class LocalStore {
     }
   }
 
-  /// Clear all mood history
+  /// Clear all mood history (legacy)
   Future<void> clearMoodHistory() async {
     await _ensure();
     try {
       await _prefs?.remove(_kMoodHistory);
     } catch (e) {
       debugPrint('clearMoodHistory error: $e');
+    }
+  }
+
+  // ========== User-specific mood history methods ==========
+
+  String _getUserMoodHistoryKey(String userId) => 'mood_history_$userId';
+
+  /// Load mood history for a specific user
+  Future<List<MoodHistoryEntry>> loadMoodHistoryForUser(String userId) async {
+    await _ensure();
+    try {
+      final key = _getUserMoodHistoryKey(userId);
+      final raw = _prefs?.getString(key);
+      if (raw == null) return [];
+      final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+      return list.map((m) => MoodHistoryEntry.fromJson(m)).toList();
+    } catch (e) {
+      debugPrint('loadMoodHistoryForUser error: $e');
+      return [];
+    }
+  }
+
+  /// Save a mood entry for a specific user
+  Future<void> saveMoodEntryForUser(
+      String userId, MoodHistoryEntry entry) async {
+    await _ensure();
+    try {
+      final history = await loadMoodHistoryForUser(userId);
+      history.add(entry);
+      // Keep only the last 1000 entries
+      final trimmed = history.length > 1000
+          ? history.sublist(history.length - 1000)
+          : history;
+      await saveMoodHistoryForUser(userId, trimmed);
+    } catch (e) {
+      debugPrint('saveMoodEntryForUser error: $e');
+    }
+  }
+
+  /// Save complete mood history for a user
+  Future<void> saveMoodHistoryForUser(
+      String userId, List<MoodHistoryEntry> history) async {
+    await _ensure();
+    try {
+      final key = _getUserMoodHistoryKey(userId);
+      final list = history.map((e) => e.toJson()).toList();
+      await _prefs?.setString(key, jsonEncode(list));
+    } catch (e) {
+      debugPrint('saveMoodHistoryForUser error: $e');
+    }
+  }
+
+  /// Update the last mood entry for a user (to add duration)
+  Future<void> updateLastMoodEntryForUser(
+      String userId, MoodHistoryEntry updatedEntry) async {
+    await _ensure();
+    try {
+      final history = await loadMoodHistoryForUser(userId);
+      if (history.isNotEmpty) {
+        history[history.length - 1] = updatedEntry;
+        await saveMoodHistoryForUser(userId, history);
+      }
+    } catch (e) {
+      debugPrint('updateLastMoodEntryForUser error: $e');
+    }
+  }
+
+  /// Clear mood history for a specific user
+  Future<void> clearMoodHistoryForUser(String userId) async {
+    await _ensure();
+    try {
+      final key = _getUserMoodHistoryKey(userId);
+      await _prefs?.remove(key);
+    } catch (e) {
+      debugPrint('clearMoodHistoryForUser error: $e');
+    }
+  }
+
+  // Static convenience methods for simple key-value storage
+  static Future<bool?> getBool(String key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(key);
+    } catch (e) {
+      debugPrint('getBool error: $e');
+      return null;
+    }
+  }
+
+  static Future<void> setBool(String key, bool value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(key, value);
+    } catch (e) {
+      debugPrint('setBool error: $e');
+    }
+  }
+
+  static Future<String?> getString(String key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(key);
+    } catch (e) {
+      debugPrint('getString error: $e');
+      return null;
+    }
+  }
+
+  static Future<void> setString(String key, String value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, value);
+    } catch (e) {
+      debugPrint('setString error: $e');
     }
   }
 }
@@ -193,7 +311,8 @@ class MoodHistoryEntry {
         'duration_seconds': durationSeconds,
       };
 
-  static MoodHistoryEntry fromJson(Map<String, dynamic> json) => MoodHistoryEntry(
+  static MoodHistoryEntry fromJson(Map<String, dynamic> json) =>
+      MoodHistoryEntry(
         mood: json['mood'] as String,
         timestamp: DateTime.parse(json['timestamp'] as String),
         durationSeconds: json['duration_seconds'] as int? ?? 0,

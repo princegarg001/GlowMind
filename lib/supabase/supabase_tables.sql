@@ -29,7 +29,20 @@ CREATE TABLE sleep_profiles (
   updated_at timestamptz DEFAULT now()
 );
 
+-- Mood history table for insights tracking
+CREATE TABLE mood_history (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  mood text NOT NULL,
+  timestamp timestamptz NOT NULL,
+  duration_seconds int DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+
 -- Indexes for better query performance
 CREATE INDEX idx_notes_user_id ON notes(user_id);
 CREATE INDEX idx_notes_created_at ON notes(created_at DESC);
 CREATE INDEX idx_sleep_profiles_user_id ON sleep_profiles(user_id);
+CREATE INDEX idx_mood_history_user_id ON mood_history(user_id);
+CREATE INDEX idx_mood_history_timestamp ON mood_history(timestamp DESC);
+CREATE INDEX idx_mood_history_user_timestamp ON mood_history(user_id, timestamp DESC);

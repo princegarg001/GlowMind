@@ -68,3 +68,27 @@ CREATE POLICY "Users can delete their own sleep profile"
   ON sleep_profiles FOR DELETE
   TO authenticated
   USING (auth.uid() = user_id);
+
+-- Mood history table RLS
+ALTER TABLE mood_history ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own mood history"
+  ON mood_history FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own mood history"
+  ON mood_history FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own mood history"
+  ON mood_history FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own mood history"
+  ON mood_history FOR DELETE
+  TO authenticated
+  USING (auth.uid() = user_id);

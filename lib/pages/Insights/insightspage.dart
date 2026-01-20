@@ -15,6 +15,8 @@ class InsightsPage extends StatefulWidget {
 class _InsightsPageState extends State<InsightsPage> {
   int _range = 0; // 0=Day, 1=Week, 2=Month
   bool _isLoading = true;
+  int _currentStreak = 0;
+  Map<String, int> _moodDurations = {};
 
   int get _daysBack {
     switch (_range) {
@@ -35,13 +37,24 @@ class _InsightsPageState extends State<InsightsPage> {
     // Load mood history immediately when page opens
     _loadInsightsData();
   }
-  
+
   Future<void> _loadInsightsData() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final musicState = context.read<MusicState>();
       await musicState.loadMoodHistory();
+
+      // Load additional stats
+      final streak = await musicState.getCurrentStreak();
+      final durations = await musicState.getMoodDurations(daysBack: _daysBack);
+
+      if (mounted) {
+        setState(() {
+          _currentStreak = streak;
+          _moodDurations = durations;
+        });
+      }
     } catch (e) {
       debugPrint('InsightsPage: Error loading data: $e');
     } finally {
@@ -50,12 +63,76 @@ class _InsightsPageState extends State<InsightsPage> {
       }
     }
   }
-  
+
+  Future<void> _clearHistory() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A0F3D),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Clear Mood History',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Are you sure you want to clear all your mood history? This action cannot be undone.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child:
+                const Text('Cancel', style: TextStyle(color: Colors.white60)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child:
+                const Text('Clear', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final musicState = context.read<MusicState>();
+      await musicState.clearMoodHistory();
+      await _loadInsightsData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Mood history cleared'),
+            backgroundColor: const Color(0xFF7C3AED),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
+  }
+
   void _onRangeChanged(int newRange) {
     if (_range != newRange) {
       setState(() {
         _range = newRange;
       });
+      // Reload durations for new time range
+      _loadDurations();
+    }
+  }
+
+  Future<void> _loadDurations() async {
+    try {
+      final musicState = context.read<MusicState>();
+      final durations = await musicState.getMoodDurations(daysBack: _daysBack);
+      if (mounted) {
+        setState(() {
+          _moodDurations = durations;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading durations: $e');
     }
   }
 
@@ -87,7 +164,7 @@ class _InsightsPageState extends State<InsightsPage> {
     if (moodCounts.isEmpty) return 0.5;
     final total = moodCounts.values.reduce((a, b) => a + b);
     if (total == 0) return 0.5;
-    
+
     // Calculate balance based on variety of moods used
     final uniqueMoods = moodCounts.length;
     final maxMoods = MoodType.values.length;
@@ -117,12 +194,13 @@ class _InsightsPageState extends State<InsightsPage> {
   Widget build(BuildContext context) {
     final musicState = context.watch<MusicState>();
     final screenHeight = MediaQuery.of(context).size.height;
-    final padding =
-        MediaQuery.of(context).padding.top + MediaQuery.of(context).padding.bottom;
-    
+    final padding = MediaQuery.of(context).padding.top +
+        MediaQuery.of(context).padding.bottom;
+
     // Get data directly from musicState for reactive updates
     final moodCounts = musicState.getMoodCounts(daysBack: _daysBack);
-    final moodTrend = musicState.getMoodTrend(days: _daysBack == 1 ? 7 : _daysBack);
+    final moodTrend =
+        musicState.getMoodTrend(days: _daysBack == 1 ? 7 : _daysBack);
 
     return Scaffold(
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
@@ -190,7 +268,8 @@ class _InsightsPageState extends State<InsightsPage> {
                         parent: BouncingScrollPhysics(),
                       ),
                       child: ConstrainedBox(
-                        constraints: BoxConstraints(minHeight: screenHeight - padding),
+                        constraints:
+                            BoxConstraints(minHeight: screenHeight - padding),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -201,6 +280,8 @@ class _InsightsPageState extends State<InsightsPage> {
                             _glowLineChart(moodTrend, moodCounts),
                             const SizedBox(height: 24),
                             _statsRow(moodCounts),
+                            const SizedBox(height: 20),
+                            _timeSpentCard(),
                             const SizedBox(height: 20),
                             _moodBreakdown(moodCounts),
                             const SizedBox(height: 20),
@@ -218,14 +299,60 @@ class _InsightsPageState extends State<InsightsPage> {
   }
 
   Widget _header() {
-    return const Text(
-      "Insights",
-      style: TextStyle(
-        fontSize: 26,
-        fontWeight: FontWeight.w600,
-        color: Colors.white,
-        shadows: [Shadow(color: Color(0xFF8B5CF6), blurRadius: 14)],
-      ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text(
+          "Insights",
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+            shadows: [Shadow(color: Color(0xFF8B5CF6), blurRadius: 14)],
+          ),
+        ),
+        Row(
+          children: [
+            // Streak badge
+            if (_currentStreak > 0)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0xFFFF6B6B), blurRadius: 10),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('🔥', style: TextStyle(fontSize: 14)),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$_currentStreak day${_currentStreak > 1 ? 's' : ''}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(width: 8),
+            // Clear history button
+            IconButton(
+              onPressed: _clearHistory,
+              icon: const Icon(Icons.delete_outline, color: Colors.white54),
+              tooltip: 'Clear history',
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -243,7 +370,8 @@ class _InsightsPageState extends State<InsightsPage> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
               gradient: active
-                  ? const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)])
+                  ? const LinearGradient(
+                      colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)])
                   : null,
               color: active ? null : Colors.white10,
               boxShadow: active
@@ -257,11 +385,14 @@ class _InsightsPageState extends State<InsightsPage> {
     );
   }
 
-  Widget _glowLineChart(List<Map<String, dynamic>> moodTrend, Map<String, int> moodCounts) {
+  Widget _glowLineChart(
+      List<Map<String, dynamic>> moodTrend, Map<String, int> moodCounts) {
     final data = _getGlowData(moodTrend);
-    final maxY = data.isEmpty ? 10.0 : data.map((s) => s.y).reduce((a, b) => a > b ? a : b);
+    final maxY = data.isEmpty
+        ? 10.0
+        : data.map((s) => s.y).reduce((a, b) => a > b ? a : b);
     final totalCount = moodCounts.values.fold(0, (a, b) => a + b);
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: _cardStyle(),
@@ -319,7 +450,8 @@ class _InsightsPageState extends State<InsightsPage> {
                       reservedSize: 22,
                       getTitlesWidget: (value, meta) {
                         if (value.toInt() < moodTrend.length) {
-                          final date = moodTrend[value.toInt()]['date'] as DateTime;
+                          final date =
+                              moodTrend[value.toInt()]['date'] as DateTime;
                           return Text(
                             '${date.day}/${date.month}',
                             style: TextStyle(
@@ -332,9 +464,12 @@ class _InsightsPageState extends State<InsightsPage> {
                       },
                     ),
                   ),
-                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
                 ),
                 borderData: FlBorderData(show: false),
                 lineBarsData: [
@@ -381,7 +516,7 @@ class _InsightsPageState extends State<InsightsPage> {
     final balance = _getMoodBalance(moodCounts);
     final mostFrequent = _getMostFrequentMood(moodCounts);
     final totalSessions = moodCounts.values.fold(0, (a, b) => a + b);
-    
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -457,6 +592,116 @@ class _InsightsPageState extends State<InsightsPage> {
     );
   }
 
+  String _formatDuration(int seconds) {
+    if (seconds < 60) return '${seconds}s';
+    if (seconds < 3600) return '${(seconds / 60).round()}m';
+    final hours = seconds ~/ 3600;
+    final mins = (seconds % 3600) ~/ 60;
+    return '${hours}h ${mins}m';
+  }
+
+  Widget _timeSpentCard() {
+    if (_moodDurations.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final totalSeconds = _moodDurations.values.fold(0, (a, b) => a + b);
+    final sortedMoods = _moodDurations.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: _cardStyle(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Time Spent',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Total: ${_formatDuration(totalSeconds)}',
+                  style: const TextStyle(
+                    color: Color(0xFF8B5CF6),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...sortedMoods.take(5).map((entry) {
+            final percentage =
+                totalSeconds > 0 ? entry.value / totalSeconds : 0.0;
+            final color = _getMoodColor(entry.key);
+            String displayName;
+            try {
+              final mood =
+                  MoodType.values.firstWhere((m) => m.name == entry.key);
+              displayName = mood.displayName;
+            } catch (_) {
+              displayName = entry.key;
+            }
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      boxShadow: [BoxShadow(color: color, blurRadius: 6)],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      displayName,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  Text(
+                    _formatDuration(entry.value),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${(percentage * 100).toInt()}%',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.5),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
   Widget _moodBreakdown(Map<String, int> moodCounts) {
     if (moodCounts.isEmpty) {
       return Container(
@@ -496,12 +741,13 @@ class _InsightsPageState extends State<InsightsPage> {
             final color = _getMoodColor(entry.key);
             String displayName;
             try {
-              final mood = MoodType.values.firstWhere((m) => m.name == entry.key);
+              final mood =
+                  MoodType.values.firstWhere((m) => m.name == entry.key);
               displayName = mood.displayName;
             } catch (_) {
               displayName = entry.key;
             }
-            
+
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Column(
@@ -544,9 +790,8 @@ class _InsightsPageState extends State<InsightsPage> {
 
   Widget _emotionRhythm(MusicState musicState) {
     final history = musicState.moodHistory;
-    final recentHistory = history.length > 20 
-        ? history.sublist(history.length - 20) 
-        : history;
+    final recentHistory =
+        history.length > 20 ? history.sublist(history.length - 20) : history;
 
     if (recentHistory.isEmpty) {
       return const SizedBox.shrink();
