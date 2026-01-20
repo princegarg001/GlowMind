@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:glowmind/nav.dart';
+import 'package:glowmind/services/freesound_service.dart';
 import 'package:glowmind/state/app_state.dart';
 import 'package:glowmind/theme.dart';
-import 'package:glowmind/nav.dart';
 import 'package:go_router/go_router.dart';
-import 'package:glowmind/services/freesound_service.dart';
-import 'package:glowmind/openai/openai_config.dart';
+import 'package:provider/provider.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -27,12 +26,6 @@ class SettingsPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          ServiceTestTile(
-            title: 'OpenAI API',
-            icon: Icons.psychology_outlined,
-            onTest: () => OpenAIClient().testConnection(),
-          ),
-          const SizedBox(height: AppSpacing.sm),
           ServiceTestTile(
             title: 'Freesound API',
             icon: Icons.api_outlined,

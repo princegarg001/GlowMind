@@ -7,7 +7,9 @@ import 'package:just_audio/just_audio.dart' as just_audio;
 import '../models/affirmation.dart';
 import '../services/affirmation_service.dart';
 import '../services/audio_recorder_service.dart';
-import '../services/web_audio_player_web.dart' if (dart.library.io) '../services/web_audio_player.dart';
+import '../services/notification_service.dart';
+import '../services/web_audio_player_web.dart'
+    if (dart.library.io) '../services/web_audio_player.dart';
 
 /// State management for affirmations
 class AffirmationState extends ChangeNotifier {
@@ -21,7 +23,7 @@ class AffirmationState extends ChangeNotifier {
 
   // Audio player for playback
   final just_audio.AudioPlayer _audioPlayer = just_audio.AudioPlayer();
-  
+
   List<Affirmation> _affirmations = [];
   List<Affirmation> _favorites = [];
   List<Affirmation> _voiceAffirmations = [];
@@ -35,6 +37,7 @@ class AffirmationState extends ChangeNotifier {
   String? _error;
   Duration _recordingDuration = Duration.zero;
   Timer? _recordingTimer;
+  bool _notificationsEnabled = false;
 
   // Getters
   List<Affirmation> get affirmations => _affirmations;
@@ -48,6 +51,7 @@ class AffirmationState extends ChangeNotifier {
   String? get currentPlayingPath => _currentPlayingPath;
   Duration get recordingDuration => _recordingDuration;
   String? get error => _error;
+  bool get notificationsEnabled => _notificationsEnabled;
 
   /// Initialize the affirmation state
   Future<void> initialize() async {
@@ -58,6 +62,9 @@ class AffirmationState extends ChangeNotifier {
     try {
       await _loadAll();
       await _loadDailyAffirmation();
+
+      // Initialize notifications
+      await _initializeNotifications();
     } catch (e) {
       _error = 'Failed to load affirmations: $e';
       debugPrint(_error);
@@ -65,6 +72,52 @@ class AffirmationState extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  /// Initialize notification service and schedule notifications
+  Future<void> _initializeNotifications() async {
+    try {
+      await NotificationService.instance.initialize();
+      _notificationsEnabled =
+          await NotificationService.instance.areNotificationsEnabled();
+
+      // Schedule notifications based on current settings
+      if (_notificationsEnabled &&
+          (_settings.morningEnabled || _settings.eveningEnabled)) {
+        await NotificationService.instance
+            .scheduleAffirmationNotifications(_settings);
+        debugPrint('Affirmation notifications scheduled');
+      }
+    } catch (e) {
+      debugPrint('Failed to initialize notifications: $e');
+    }
+  }
+
+  /// Request notification permissions
+  Future<bool> requestNotificationPermissions() async {
+    final granted = await NotificationService.instance.requestPermissions();
+    _notificationsEnabled = granted;
+    notifyListeners();
+
+    if (granted) {
+      await _scheduleNotifications();
+    }
+
+    return granted;
+  }
+
+  /// Schedule notifications with current settings
+  Future<void> _scheduleNotifications() async {
+    if (_settings.morningEnabled || _settings.eveningEnabled) {
+      await NotificationService.instance
+          .scheduleAffirmationNotifications(_settings);
+    }
+  }
+
+  /// Send a test notification
+  Future<void> sendTestNotification({bool isMorning = true}) async {
+    await NotificationService.instance
+        .showTestNotification(isMorning: isMorning);
   }
 
   Future<void> _loadAll() async {
@@ -90,14 +143,15 @@ class AffirmationState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final affirmation = await AffirmationService.generatePersonalizedAffirmation(
+      final affirmation =
+          await AffirmationService.generatePersonalizedAffirmation(
         moodCounts: moodCounts,
         currentMood: currentMood,
       );
 
       await AffirmationService.saveAffirmation(affirmation);
       await AffirmationService.saveDailyAffirmation(affirmation);
-      
+
       _affirmations.insert(0, affirmation);
       _dailyAffirmation = affirmation;
 
@@ -118,10 +172,11 @@ class AffirmationState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final affirmation = AffirmationService.getAffirmationForCategory(category);
+      final affirmation =
+          AffirmationService.getAffirmationForCategory(category);
       await AffirmationService.saveAffirmation(affirmation);
       _affirmations.insert(0, affirmation);
-      
+
       return affirmation;
     } finally {
       _isLoading = false;
@@ -140,7 +195,7 @@ class AffirmationState extends ChangeNotifier {
     }
 
     _favorites = _affirmations.where((a) => a.isFavorite).toList();
-    
+
     if (_dailyAffirmation?.id == affirmation.id) {
       _dailyAffirmation = updated;
     }
@@ -151,7 +206,7 @@ class AffirmationState extends ChangeNotifier {
   /// Delete an affirmation
   Future<void> deleteAffirmation(Affirmation affirmation) async {
     await AffirmationService.deleteAffirmation(affirmation.id);
-    
+
     if (affirmation.audioPath != null) {
       await AudioRecorderService.deleteRecording(affirmation.audioPath!);
     }
@@ -171,14 +226,14 @@ class AffirmationState extends ChangeNotifier {
     _currentRecordingPath = await AudioRecorderService.startRecording(tempId);
     _isRecording = _currentRecordingPath != null;
     _recordingDuration = Duration.zero;
-    
+
     // Start timer for recording duration
     _recordingTimer?.cancel();
     _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _recordingDuration += const Duration(seconds: 1);
       notifyListeners();
     });
-    
+
     notifyListeners();
   }
 
@@ -247,11 +302,11 @@ class AffirmationState extends ChangeNotifier {
       if (_isPlaying) {
         await stopPlayback();
       }
-      
+
       _currentPlayingPath = path;
       _isPlaying = true;
       notifyListeners();
-      
+
       // Use HTML5 Audio for web blob URLs (just_audio has issues with blob URLs)
       if (kIsWeb && path.startsWith('blob:')) {
         debugPrint('AffirmationState: Using WebAudioPlayer for blob URL');
@@ -264,10 +319,10 @@ class AffirmationState extends ChangeNotifier {
         debugPrint('AffirmationState: WebAudioPlayer started');
         return;
       }
-      
+
       // Ensure volume is set
       await _audioPlayer.setVolume(1.0);
-      
+
       // Handle both file paths and http URLs
       if (path.startsWith('http')) {
         debugPrint('AffirmationState: Using setUrl for: $path');
@@ -276,15 +331,16 @@ class AffirmationState extends ChangeNotifier {
         debugPrint('AffirmationState: Using setFilePath for: $path');
         await _audioPlayer.setFilePath(path);
       }
-      
+
       // Get duration to verify audio loaded correctly
       final duration = _audioPlayer.duration;
       debugPrint('AffirmationState: Audio duration: $duration');
-      
+
       debugPrint('AffirmationState: Audio source set, starting playback...');
       await _audioPlayer.play();
-      debugPrint('AffirmationState: Playback started, volume: ${_audioPlayer.volume}');
-      
+      debugPrint(
+          'AffirmationState: Playback started, volume: ${_audioPlayer.volume}');
+
       // Listen for completion
       _audioPlayer.playerStateStream.listen((state) {
         debugPrint('AffirmationState: Player state: ${state.processingState}');
@@ -353,6 +409,10 @@ class AffirmationState extends ChangeNotifier {
       preferredCategories: preferredCategories,
     );
     await AffirmationService.saveSettings(_settings);
+
+    // Reschedule notifications with new settings
+    await _scheduleNotifications();
+
     notifyListeners();
   }
 
@@ -386,6 +446,7 @@ class AffirmationState extends ChangeNotifier {
   /// Clear all affirmation data
   Future<void> clearAllData() async {
     await AffirmationService.clearAllAffirmations();
+    await NotificationService.instance.cancelAllNotifications();
     _affirmations = [];
     _favorites = [];
     _voiceAffirmations = [];

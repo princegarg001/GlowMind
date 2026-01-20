@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+
 import '../../models/affirmation.dart';
 import '../../state/affirmation_state.dart';
 import '../../theme.dart';
@@ -9,7 +10,8 @@ class AffirmationSettingsPage extends StatefulWidget {
   const AffirmationSettingsPage({super.key});
 
   @override
-  State<AffirmationSettingsPage> createState() => _AffirmationSettingsPageState();
+  State<AffirmationSettingsPage> createState() =>
+      _AffirmationSettingsPageState();
 }
 
 class _AffirmationSettingsPageState extends State<AffirmationSettingsPage> {
@@ -106,6 +108,9 @@ class _AffirmationSettingsPageState extends State<AffirmationSettingsPage> {
       title: "Reminders",
       icon: Icons.notifications_outlined,
       children: [
+        // Permission status banner
+        if (!state.notificationsEnabled) _buildPermissionBanner(state),
+        if (!state.notificationsEnabled) const SizedBox(height: 16),
         _buildNotificationTile(
           title: "Morning Affirmation",
           subtitle: "Start your day with positivity",
@@ -113,8 +118,11 @@ class _AffirmationSettingsPageState extends State<AffirmationSettingsPage> {
           iconColor: const Color(0xFFF59E0B),
           isEnabled: state.settings.morningNotifications,
           time: state.settings.morningTime,
-          onToggle: (value) {
+          onToggle: (value) async {
             HapticFeedback.lightImpact();
+            if (value && !state.notificationsEnabled) {
+              await state.requestNotificationPermissions();
+            }
             state.updateSettings(morningNotifications: value);
           },
           onTimeTap: () => _showTimePicker(
@@ -131,8 +139,11 @@ class _AffirmationSettingsPageState extends State<AffirmationSettingsPage> {
           iconColor: const Color(0xFF8B5CF6),
           isEnabled: state.settings.eveningNotifications,
           time: state.settings.eveningTime,
-          onToggle: (value) {
+          onToggle: (value) async {
             HapticFeedback.lightImpact();
+            if (value && !state.notificationsEnabled) {
+              await state.requestNotificationPermissions();
+            }
             state.updateSettings(eveningNotifications: value);
           },
           onTimeTap: () => _showTimePicker(
@@ -141,7 +152,175 @@ class _AffirmationSettingsPageState extends State<AffirmationSettingsPage> {
             (time) => state.updateSettings(eveningTime: time),
           ),
         ),
+        const SizedBox(height: 16),
+        _buildTestNotificationButton(state),
       ],
+    );
+  }
+
+  Widget _buildPermissionBanner(AffirmationState state) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded,
+              color: Colors.amber, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Notifications Disabled",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "Enable to receive affirmation reminders",
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              HapticFeedback.mediumImpact();
+              await state.requestNotificationPermissions();
+            },
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.amber.withValues(alpha: 0.2),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              "Enable",
+              style:
+                  TextStyle(color: Colors.amber, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTestNotificationButton(AffirmationState state) {
+    return GestureDetector(
+      onTap: () async {
+        HapticFeedback.mediumImpact();
+
+        // Request permissions if not granted
+        if (!state.notificationsEnabled) {
+          final granted = await state.requestNotificationPermissions();
+          if (!granted) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content:
+                      Text('Please enable notifications in system settings'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
+            return;
+          }
+        }
+
+        // Send test notification
+        await state.sendTestNotification(isMorning: true);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('Test notification sent!'),
+                ],
+              ),
+              backgroundColor: const Color(0xFF10B981),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          );
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+              const Color(0xFFEC4899).withValues(alpha: 0.15),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF8B5CF6).withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.send_rounded,
+                color: Color(0xFF8B5CF6),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Send Test Notification",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    "Verify notifications are working",
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.white38,
+              size: 16,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -162,7 +341,8 @@ class _AffirmationSettingsPageState extends State<AffirmationSettingsPage> {
           spacing: 10,
           runSpacing: 10,
           children: AffirmationCategory.values.map((category) {
-            final isSelected = state.settings.preferredCategories.contains(category);
+            final isSelected =
+                state.settings.preferredCategories.contains(category);
             return GestureDetector(
               onTap: () {
                 HapticFeedback.lightImpact();
@@ -191,7 +371,8 @@ class _AffirmationSettingsPageState extends State<AffirmationSettingsPage> {
                           ],
                         )
                       : null,
-                  color: isSelected ? null : Colors.white.withValues(alpha: 0.06),
+                  color:
+                      isSelected ? null : Colors.white.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
                     color: isSelected
@@ -223,7 +404,8 @@ class _AffirmationSettingsPageState extends State<AffirmationSettingsPage> {
                         color: isSelected
                             ? Colors.white
                             : Colors.white.withValues(alpha: 0.8),
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w400,
                         fontSize: 13,
                       ),
                     ),

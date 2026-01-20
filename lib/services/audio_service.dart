@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:glowmind/models/music_models.dart';
+import 'package:glowmind/services/notification_service.dart';
 import 'package:just_audio/just_audio.dart' as just_audio;
 import 'package:rxdart/rxdart.dart';
 
@@ -12,14 +13,14 @@ class AudioService {
   // Singleton instance
   static final AudioService _instance = AudioService._internal();
   factory AudioService() => _instance;
-  
+
   just_audio.AudioPlayer? _player; // Recreated as needed for web compatibility
   just_audio.AudioPlayer? _alarmPlayer; // Separate player for alarm sound
   final Random _random = Random();
   bool _isInitialized = false;
   bool _isDisposed = false;
   bool _alarmEnabled = true; // Whether to play alarm when timer completes
-  
+
   StreamSubscription? _positionSubscription;
   StreamSubscription? _playerStateSubscription;
   StreamSubscription? _sleepTimerSubscription;
@@ -56,7 +57,8 @@ class AudioService {
   Stream<Duration> get positionStream => _positionController.stream;
   Stream<Duration?> get durationStream => _durationController.stream;
   Stream<SleepTimer?> get sleepTimerStream => _sleepTimerController.stream;
-  Stream<void> get sleepTimerCompletedStream => _sleepTimerCompletedController.stream;
+  Stream<void> get sleepTimerCompletedStream =>
+      _sleepTimerCompletedController.stream;
   Stream<String> get errorStream => _errorController.stream;
 
   Playlist? get currentPlaylist => _currentPlaylist;
@@ -84,18 +86,20 @@ class AudioService {
   /// Initialize the audio player (called once)
   Future<void> _initPlayer() async {
     if (_isDisposed || _isInitialized) return;
-    
+
     try {
       debugPrint('AudioService: Initializing player');
-      
+
       // Configure audio session for background playback
       if (!kIsWeb) {
         final session = await AudioSession.instance;
         await session.configure(const AudioSessionConfiguration(
           avAudioSessionCategory: AVAudioSessionCategory.playback,
-          avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions.duckOthers,
+          avAudioSessionCategoryOptions:
+              AVAudioSessionCategoryOptions.duckOthers,
           avAudioSessionMode: AVAudioSessionMode.defaultMode,
-          avAudioSessionRouteSharingPolicy: AVAudioSessionRouteSharingPolicy.defaultPolicy,
+          avAudioSessionRouteSharingPolicy:
+              AVAudioSessionRouteSharingPolicy.defaultPolicy,
           avAudioSessionSetActiveOptions: AVAudioSessionSetActiveOptions.none,
           androidAudioAttributes: AndroidAudioAttributes(
             contentType: AndroidAudioContentType.music,
@@ -107,7 +111,7 @@ class AudioService {
       }
 
       await _ensurePlayerExists();
-      
+
       _isInitialized = true;
       debugPrint('AudioService: Player initialized successfully');
     } catch (e) {
@@ -119,16 +123,16 @@ class AudioService {
   /// Ensure player exists and is subscribed
   Future<void> _ensurePlayerExists() async {
     if (_player != null) return;
-    
+
     _player = just_audio.AudioPlayer();
-    
+
     // Listen to player state changes with error handling
     _playerStateSubscription = _player!.playerStateStream.listen(
       (state) {
         if (_isDisposed || _player == null) return;
         try {
           _isPlayingController.add(state.playing);
-          
+
           // Handle track completion
           if (state.processingState == just_audio.ProcessingState.completed) {
             _onTrackCompleted();
@@ -172,8 +176,9 @@ class AudioService {
   /// Load and play a playlist
   Future<void> loadPlaylist(Playlist playlist, {int startIndex = 0}) async {
     try {
-      debugPrint('AudioService: Loading playlist "${playlist.name}" with ${playlist.tracks.length} tracks');
-      
+      debugPrint(
+          'AudioService: Loading playlist "${playlist.name}" with ${playlist.tracks.length} tracks');
+
       if (playlist.tracks.isEmpty) {
         debugPrint('AudioService: Cannot load empty playlist');
         _errorController.add('Playlist is empty');
@@ -187,7 +192,7 @@ class AudioService {
 
       // Reset failure count for new playlist
       _failedTrackCount = 0;
-      
+
       _currentPlaylist = playlist;
       _currentTrackIndex = startIndex.clamp(0, playlist.tracks.length - 1);
       _generateShuffleOrder();
@@ -208,7 +213,7 @@ class AudioService {
       debugPrint('AudioService: No current track to load');
       return;
     }
-    
+
     // Prevent duplicate loading
     if (_loadingTrackId == track.id) {
       debugPrint('AudioService: Already loading track ${track.id}');
@@ -221,7 +226,7 @@ class AudioService {
       debugPrint('AudioService: Loading track "${track.name}"');
       debugPrint('AudioService: Track URL: ${track.url}');
       _trackController.add(track);
-      
+
       // On web, recreate player for each track to avoid "player already exists" error
       if (kIsWeb) {
         await _recreatePlayerForWeb();
@@ -229,29 +234,31 @@ class AudioService {
         // On mobile, just stop current playback
         await _player?.stop();
       }
-      
+
       await _ensurePlayerExists();
-      
+
       // Load audio with timeout and retry on web-specific errors
       await _loadAudioSource(track);
-      
+
       // Reset failure count on success
       _failedTrackCount = 0;
       debugPrint('AudioService: Track loaded successfully');
     } catch (e) {
       debugPrint('AudioService: _loadCurrentTrack error: $e');
       _failedTrackCount++;
-      
+
       // Skip to next track if this one fails, but prevent infinite loop
-      if (_failedTrackCount < _maxConsecutiveFailures && 
-          _currentPlaylist != null && 
+      if (_failedTrackCount < _maxConsecutiveFailures &&
+          _currentPlaylist != null &&
           _currentPlaylist!.tracks.length > 1) {
-        debugPrint('AudioService: Skipping failed track (${_failedTrackCount}/$_maxConsecutiveFailures failures)');
+        debugPrint(
+            'AudioService: Skipping failed track (${_failedTrackCount}/$_maxConsecutiveFailures failures)');
         _loadingTrackId = null; // Reset to allow loading next track
         await _skipToNextTrackSilently();
       } else {
         debugPrint('AudioService: Too many consecutive failures, stopping');
-        _errorController.add('All tracks failed to load. The audio URLs may be expired or blocked. Please try different playlists.');
+        _errorController.add(
+            'All tracks failed to load. The audio URLs may be expired or blocked. Please try different playlists.');
         _failedTrackCount = 0;
       }
     } finally {
@@ -262,30 +269,32 @@ class AudioService {
   /// Load audio source with retry logic for web platform issues
   Future<void> _loadAudioSource(Track track, {int retryCount = 0}) async {
     const maxRetries = 3;
-    
+
     try {
       final loadFuture = track.source == 'bundled'
           ? _player!.setAsset(track.url)
           : _player!.setUrl(track.url);
-          
+
       await loadFuture.timeout(
         _loadTimeout,
         onTimeout: () {
-          throw TimeoutException('Track loading timed out after ${_loadTimeout.inSeconds}s');
+          throw TimeoutException(
+              'Track loading timed out after ${_loadTimeout.inSeconds}s');
         },
       );
     } catch (e) {
       // Check if this is the "player already exists" error on web
-      if (kIsWeb && 
-          retryCount < maxRetries && 
+      if (kIsWeb &&
+          retryCount < maxRetries &&
           e.toString().contains('already exists')) {
-        debugPrint('AudioService: Player conflict detected, retrying (${retryCount + 1}/$maxRetries)...');
-        
+        debugPrint(
+            'AudioService: Player conflict detected, retrying (${retryCount + 1}/$maxRetries)...');
+
         // Force recreate player and retry with increasing delay
         await _recreatePlayerForWeb();
         await Future.delayed(Duration(milliseconds: 200 * (retryCount + 1)));
         await _ensurePlayerExists();
-        
+
         return _loadAudioSource(track, retryCount: retryCount + 1);
       }
       rethrow;
@@ -296,13 +305,13 @@ class AudioService {
   Future<void> _recreatePlayerForWeb() async {
     if (_player != null) {
       debugPrint('AudioService: Disposing player for web reload');
-      
+
       // Cancel all subscriptions first
       await _positionSubscription?.cancel();
       await _playerStateSubscription?.cancel();
       _positionSubscription = null;
       _playerStateSubscription = null;
-      
+
       try {
         // Stop playback before disposal
         try {
@@ -310,11 +319,11 @@ class AudioService {
         } catch (e) {
           // Ignore stop errors
         }
-        
+
         // Dispose and wait longer for web platform cleanup
         await _player!.dispose();
         _player = null;
-        
+
         // Give web platform more time to fully clean up
         await Future.delayed(const Duration(milliseconds: 150));
       } catch (e) {
@@ -325,20 +334,20 @@ class AudioService {
       }
     }
   }
-  
+
   /// Skip to next track without triggering play (for error recovery)
   Future<void> _skipToNextTrackSilently() async {
     if (_currentPlaylist == null || _currentPlaylist!.tracks.isEmpty) return;
-    
+
     final tracksCount = _currentPlaylist!.tracks.length;
     _currentTrackIndex = (_currentTrackIndex + 1) % tracksCount;
-    
+
     // Don't loop back if we've tried all tracks
     if (_currentTrackIndex == 0) {
       debugPrint('AudioService: Tried all tracks, stopping');
       return;
     }
-    
+
     await _loadCurrentTrack();
   }
 
@@ -348,7 +357,8 @@ class AudioService {
       debugPrint('AudioService: Starting playback...');
       await _ensurePlayerExists();
       await _player!.play();
-      debugPrint('AudioService: Playback started, isPlaying: ${_player!.playing}');
+      debugPrint(
+          'AudioService: Playback started, isPlaying: ${_player!.playing}');
     } catch (e) {
       debugPrint('AudioService: play error: $e');
       _errorController.add('Failed to start playback');
@@ -378,7 +388,7 @@ class AudioService {
     if (_currentPlaylist == null || _currentPlaylist!.tracks.isEmpty) return;
 
     final tracksCount = _currentPlaylist!.tracks.length;
-    
+
     if (_loopMode == LoopMode.one) {
       // Restart current track
       await _player?.seek(Duration.zero);
@@ -493,9 +503,15 @@ class AudioService {
     );
     _sleepTimerController.add(_sleepTimer);
 
+    // Schedule background notification alarm (works even when app is closed)
+    if (_alarmEnabled) {
+      NotificationService.instance.scheduleSleepTimerAlarm(duration);
+    }
+
     // Schedule timer to fade out and stop
     final fadeStartDuration = duration - const Duration(seconds: 30);
-    if (fadeStartDuration.isNegative || fadeStartDuration.inMilliseconds < 100) {
+    if (fadeStartDuration.isNegative ||
+        fadeStartDuration.inMilliseconds < 100) {
       // If duration is less than 30 seconds, start fading immediately
       _startFadeOut(duration);
     } else {
@@ -505,16 +521,21 @@ class AudioService {
       });
     }
 
-    // Schedule final stop and play alarm
-    _sleepTimerSubscription = Stream.periodic(Duration.zero).take(1).delay(duration).listen((_) async {
+    // Schedule final stop and play alarm (for when app is in foreground)
+    _sleepTimerSubscription = Stream.periodic(Duration.zero)
+        .take(1)
+        .delay(duration)
+        .listen((_) async {
       await stop();
       _sleepTimerCompletedController.add(null);
-      
-      // Play alarm sound if enabled
+
+      // Play alarm sound if enabled (foreground alarm)
       if (_alarmEnabled) {
         await _playAlarmSound();
+        // Cancel the background notification since we're handling it in foreground
+        NotificationService.instance.cancelSleepTimerAlarm();
       }
-      
+
       cancelSleepTimer();
     });
   }
@@ -524,16 +545,17 @@ class AudioService {
     try {
       _alarmPlayer?.dispose();
       _alarmPlayer = just_audio.AudioPlayer();
-      
+
       // Use a gentle alarm sound from online source (soft chime/bell)
       // This is a free, gentle wake-up tone
-      const alarmUrl = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
-      
+      const alarmUrl =
+          'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+
       await _alarmPlayer!.setUrl(alarmUrl);
       await _alarmPlayer!.setVolume(0.7);
       await _alarmPlayer!.setLoopMode(just_audio.LoopMode.one);
       await _alarmPlayer!.play();
-      
+
       debugPrint('AudioService: Alarm sound started');
     } catch (e) {
       debugPrint('AudioService: Failed to play alarm from URL: $e');
@@ -598,7 +620,8 @@ class AudioService {
     var currentStep = 0;
 
     _fadeOutTimer?.cancel();
-    _fadeOutTimer = Timer.periodic(Duration(milliseconds: stepDuration), (timer) {
+    _fadeOutTimer =
+        Timer.periodic(Duration(milliseconds: stepDuration), (timer) {
       currentStep++;
       final newVolume = initialVolume * (1 - currentStep / steps);
       _player?.setVolume(newVolume.clamp(0.0, 1.0));
@@ -616,6 +639,9 @@ class AudioService {
     _fadeOutTimer?.cancel();
     _sleepTimer = null;
     _sleepTimerController.add(null);
+
+    // Also cancel the background notification alarm
+    NotificationService.instance.cancelSleepTimerAlarm();
   }
 
   /// Handle track completion
@@ -626,10 +652,10 @@ class AudioService {
   /// Generate shuffle order
   void _generateShuffleOrder() {
     if (_currentPlaylist == null) return;
-    
+
     final count = _currentPlaylist!.tracks.length;
     _shuffleOrder = List.generate(count, (i) => i);
-    
+
     if (_shuffle) {
       _shuffleOrder.shuffle(_random);
     }

@@ -4,6 +4,7 @@ import 'package:glowmind/services/audio_recorder_service.dart';
 import 'package:glowmind/services/audio_service.dart';
 import 'package:glowmind/services/glow_engine.dart';
 import 'package:glowmind/services/music_storage.dart';
+import 'package:glowmind/services/notification_service.dart';
 import 'package:glowmind/services/supabase_service.dart';
 import 'package:glowmind/state/affirmation_state.dart';
 import 'package:glowmind/state/app_state.dart';
@@ -16,13 +17,21 @@ import 'theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   try {
     await SupabaseConfig.initialize();
   } catch (e) {
     debugPrint('Supabase initialization error: $e');
   }
-  
+
+  // Initialize notification service early for background tasks
+  try {
+    await NotificationService.instance.initialize();
+    debugPrint('NotificationService initialized in main');
+  } catch (e) {
+    debugPrint('Notification initialization error: $e');
+  }
+
   runApp(const MyApp());
 }
 

@@ -23,6 +23,10 @@ dependencies:
   share_plus: ^10.1.4
   record: ^5.2.1
   path_provider: ^2.1.5
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.10.0
+  flutter_timezone: ^3.0.1
+  workmanager: ^0.5.2
 
 dev_dependencies:
   flutter_test:
