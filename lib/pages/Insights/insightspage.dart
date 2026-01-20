@@ -14,6 +14,7 @@ class InsightsPage extends StatefulWidget {
 
 class _InsightsPageState extends State<InsightsPage> {
   int _range = 0; // 0=Day, 1=Week, 2=Month
+  bool _isLoading = true;
 
   int get _daysBack {
     switch (_range) {
@@ -31,30 +32,46 @@ class _InsightsPageState extends State<InsightsPage> {
   @override
   void initState() {
     super.initState();
-    // Load mood history when page opens
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<MusicState>().loadMoodHistory();
-    });
+    // Load mood history immediately when page opens
+    _loadInsightsData();
+  }
+  
+  Future<void> _loadInsightsData() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      final musicState = context.read<MusicState>();
+      await musicState.loadMoodHistory();
+    } catch (e) {
+      debugPrint('InsightsPage: Error loading data: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+  
+  void _onRangeChanged(int newRange) {
+    if (_range != newRange) {
+      setState(() {
+        _range = newRange;
+      });
+    }
   }
 
-  List<FlSpot> _getGlowData(MusicState musicState) {
-    final trend = musicState.getMoodTrend(days: _daysBack == 1 ? 7 : _daysBack);
-    if (trend.isEmpty) {
+  List<FlSpot> _getGlowData(List<Map<String, dynamic>> moodTrend) {
+    if (moodTrend.isEmpty) {
       // Return dummy data if no history
       return List.generate(7, (i) => FlSpot(i.toDouble(), 0));
     }
-    return trend.asMap().entries.map((e) {
+    return moodTrend.asMap().entries.map((e) {
       return FlSpot(e.key.toDouble(), (e.value['count'] as int).toDouble());
     }).toList();
   }
 
-  Map<String, int> _getMoodCounts(MusicState musicState) {
-    return musicState.getMoodCounts(daysBack: _daysBack);
-  }
-
-  String _getMostFrequentMood(Map<String, int> counts) {
-    if (counts.isEmpty) return 'None';
-    final sorted = counts.entries.toList()
+  String _getMostFrequentMood(Map<String, int> moodCounts) {
+    if (moodCounts.isEmpty) return 'None';
+    final sorted = moodCounts.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final moodName = sorted.first.key;
     // Convert enum name to display name
@@ -66,13 +83,13 @@ class _InsightsPageState extends State<InsightsPage> {
     }
   }
 
-  double _getMoodBalance(Map<String, int> counts) {
-    if (counts.isEmpty) return 0.5;
-    final total = counts.values.reduce((a, b) => a + b);
+  double _getMoodBalance(Map<String, int> moodCounts) {
+    if (moodCounts.isEmpty) return 0.5;
+    final total = moodCounts.values.reduce((a, b) => a + b);
     if (total == 0) return 0.5;
     
     // Calculate balance based on variety of moods used
-    final uniqueMoods = counts.length;
+    final uniqueMoods = moodCounts.length;
     final maxMoods = MoodType.values.length;
     return uniqueMoods / maxMoods;
   }
@@ -99,10 +116,13 @@ class _InsightsPageState extends State<InsightsPage> {
   @override
   Widget build(BuildContext context) {
     final musicState = context.watch<MusicState>();
-    final moodCounts = _getMoodCounts(musicState);
     final screenHeight = MediaQuery.of(context).size.height;
     final padding =
         MediaQuery.of(context).padding.top + MediaQuery.of(context).padding.bottom;
+    
+    // Get data directly from musicState for reactive updates
+    final moodCounts = musicState.getMoodCounts(daysBack: _daysBack);
+    final moodTrend = musicState.getMoodTrend(days: _daysBack == 1 ? 7 : _daysBack);
 
     return Scaffold(
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
@@ -146,29 +166,51 @@ class _InsightsPageState extends State<InsightsPage> {
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: screenHeight - padding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _header(),
-                    const SizedBox(height: 20),
-                    _rangeToggle(),
-                    const SizedBox(height: 24),
-                    _glowLineChart(musicState),
-                    const SizedBox(height: 24),
-                    _statsRow(moodCounts),
-                    const SizedBox(height: 20),
-                    _moodBreakdown(moodCounts),
-                    const SizedBox(height: 20),
-                    _emotionRhythm(musicState),
-                    const SizedBox(height: 80), // space for button
-                  ],
-                ),
-              ),
-            ),
+            child: _isLoading
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation(Color(0xFF8B5CF6)),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'Loading insights...',
+                          style: TextStyle(color: Colors.white60),
+                        ),
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadInsightsData,
+                    color: const Color(0xFF8B5CF6),
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: screenHeight - padding),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _header(),
+                            const SizedBox(height: 20),
+                            _rangeToggle(),
+                            const SizedBox(height: 24),
+                            _glowLineChart(moodTrend, moodCounts),
+                            const SizedBox(height: 24),
+                            _statsRow(moodCounts),
+                            const SizedBox(height: 20),
+                            _moodBreakdown(moodCounts),
+                            const SizedBox(height: 20),
+                            _emotionRhythm(musicState),
+                            const SizedBox(height: 80), // space for button
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
           ),
         ),
       ),
@@ -193,7 +235,7 @@ class _InsightsPageState extends State<InsightsPage> {
       children: List.generate(3, (i) {
         final active = _range == i;
         return GestureDetector(
-          onTap: () => setState(() => _range = i),
+          onTap: () => _onRangeChanged(i),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             margin: const EdgeInsets.only(right: 10),
@@ -215,9 +257,10 @@ class _InsightsPageState extends State<InsightsPage> {
     );
   }
 
-  Widget _glowLineChart(MusicState musicState) {
-    final data = _getGlowData(musicState);
+  Widget _glowLineChart(List<Map<String, dynamic>> moodTrend, Map<String, int> moodCounts) {
+    final data = _getGlowData(moodTrend);
     final maxY = data.isEmpty ? 10.0 : data.map((s) => s.y).reduce((a, b) => a > b ? a : b);
+    final totalCount = moodCounts.values.fold(0, (a, b) => a + b);
     
     return Container(
       padding: const EdgeInsets.all(16),
@@ -225,13 +268,34 @@ class _InsightsPageState extends State<InsightsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Mood Activity',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Mood Activity',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              // Show total count for quick insight
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$totalCount total',
+                  style: const TextStyle(
+                    color: Color(0xFF8B5CF6),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -254,9 +318,8 @@ class _InsightsPageState extends State<InsightsPage> {
                       showTitles: true,
                       reservedSize: 22,
                       getTitlesWidget: (value, meta) {
-                        final trend = musicState.getMoodTrend(days: _daysBack == 1 ? 7 : _daysBack);
-                        if (value.toInt() < trend.length) {
-                          final date = trend[value.toInt()]['date'] as DateTime;
+                        if (value.toInt() < moodTrend.length) {
+                          final date = moodTrend[value.toInt()]['date'] as DateTime;
                           return Text(
                             '${date.day}/${date.month}',
                             style: TextStyle(

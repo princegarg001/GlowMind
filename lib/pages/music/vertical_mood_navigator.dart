@@ -24,8 +24,10 @@ class VerticalMoodNavigator extends StatefulWidget {
 
 class _VerticalMoodNavigatorState extends State<VerticalMoodNavigator> {
   late PageController _pageController;
-  // Tracks the current mood index (0.._moods.length-1), independent of page index
-  int _currentMoodIndex = 0;
+  // Tracks the currently displayed mood index for visual updates
+  int _displayMoodIndex = 0;
+  // Tracks the mood index that has been loaded in MusicState
+  int _loadedMoodIndex = 0;
   int _scrollingToMoodIndex = 0; // Next mood during scroll
   double _lastVolume = 0.7;
   bool _showWelcome = true;
@@ -87,13 +89,13 @@ class _VerticalMoodNavigatorState extends State<VerticalMoodNavigator> {
     final displayMoodIndex = roundedPage % _moods.length;
     final nextIndex = (pageFloor + 1) % _moods.length;
     
-    // Update immediately for responsive UI
+    // Update visual state immediately for responsive UI
     if (_scrollProgress != progress || 
-        _currentMoodIndex != displayMoodIndex ||
+        _displayMoodIndex != displayMoodIndex ||
         _scrollingToMoodIndex != nextIndex) {
       setState(() {
         _scrollProgress = progress;
-        _currentMoodIndex = displayMoodIndex;
+        _displayMoodIndex = displayMoodIndex;
         _scrollingToMoodIndex = nextIndex;
       });
     }
@@ -105,9 +107,10 @@ class _VerticalMoodNavigatorState extends State<VerticalMoodNavigator> {
 
     if (lastMood != null) {
       final index = _moods.indexOf(lastMood);
-      if (index >= 0 && index != _currentMoodIndex) {
+      if (index >= 0 && index != _displayMoodIndex) {
         setState(() {
-          _currentMoodIndex = index;
+          _displayMoodIndex = index;
+          _loadedMoodIndex = index;
         });
         // Jump to anchored page that maps to this mood
         _pageController.jumpToPage(_basePage + index);
@@ -131,12 +134,20 @@ class _VerticalMoodNavigatorState extends State<VerticalMoodNavigator> {
   void _onPageChanged(int pageIndex) {
     // Map the large page space back to a mood index
     final nextMoodIndex = pageIndex % _moods.length;
-    if (nextMoodIndex == _currentMoodIndex) return;
+    
+    // Compare against the LOADED mood, not the display mood
+    if (nextMoodIndex == _loadedMoodIndex) return;
 
-    setState(() => _currentMoodIndex = nextMoodIndex);
+    // Update both display and loaded indices
+    setState(() {
+      _displayMoodIndex = nextMoodIndex;
+      _loadedMoodIndex = nextMoodIndex;
+    });
 
+    // Trigger the actual playlist change
     final musicState = context.read<MusicState>();
     final newMood = _moods[nextMoodIndex];
+    debugPrint('VerticalMoodNavigator: Changing to mood ${newMood.name}');
     musicState.changeMood(newMood);
   }
 
@@ -166,7 +177,7 @@ class _VerticalMoodNavigatorState extends State<VerticalMoodNavigator> {
   Widget build(BuildContext context) {
     final musicState = context.watch<MusicState>();
     final track = musicState.currentTrack;
-    final currentMood = _moods[_currentMoodIndex];
+    final currentMood = _moods[_displayMoodIndex];
     final nextMood = _moods[_scrollingToMoodIndex];
 
     return Scaffold(
