@@ -120,9 +120,11 @@ VALUES ('global_sleep_default', 'global', 'sleep', 'Sleep Sounds', true)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO playlist_tracks (playlist_id, track_name, track_url, source, order_index) VALUES
-  ('global_sleep_default', 'Rain on Leaves', 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3', 'url', 0),
-  ('global_sleep_default', 'Soft Piano Lullaby', 'https://cdn.pixabay.com/audio/2022/02/23/audio_ea70ad08e3.mp3', 'url', 1),
-  ('global_sleep_default', 'Ocean Waves', 'https://cdn.pixabay.com/audio/2022/06/07/audio_b9bd4170e4.mp3', 'url', 2)
+  ('global_sleep_default', 'Rain on Leaves', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', 'url', 0),
+  ('global_sleep_default', 'Soft Piano Lullaby', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', 'url', 1),
+  ('global_sleep_default', 'Ocean Waves', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', 'url', 2),
+  ('global_sleep_default', 'Peaceful Dreams', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3', 'url', 3),
+  ('global_sleep_default', 'Night Calm', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3', 'url', 4)
 ON CONFLICT DO NOTHING;
 
 -- Study mood default tracks
@@ -131,9 +133,11 @@ VALUES ('global_study_default', 'global', 'study', 'Study Focus', true)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO playlist_tracks (playlist_id, track_name, track_url, source, order_index) VALUES
-  ('global_study_default', 'Lo-fi Study Beat', 'https://cdn.pixabay.com/audio/2022/10/25/audio_946b0939c5.mp3', 'url', 0),
-  ('global_study_default', 'Focus Ambient', 'https://cdn.pixabay.com/audio/2022/03/15/audio_8cb749d484.mp3', 'url', 1),
-  ('global_study_default', 'Coffee Shop Vibes', 'https://cdn.pixabay.com/audio/2023/07/30/audio_e5e5d61a5e.mp3', 'url', 2)
+  ('global_study_default', 'Lo-fi Study Beat', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3', 'url', 0),
+  ('global_study_default', 'Focus Ambient', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3', 'url', 1),
+  ('global_study_default', 'Coffee Shop Vibes', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3', 'url', 2),
+  ('global_study_default', 'Deep Work', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3', 'url', 3),
+  ('global_study_default', 'Brain Power', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3', 'url', 4)
 ON CONFLICT DO NOTHING;
 
 -- Party mood default tracks
@@ -142,9 +146,11 @@ VALUES ('global_party_default', 'global', 'party', 'Party Vibes', true)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO playlist_tracks (playlist_id, track_name, track_url, source, order_index) VALUES
-  ('global_party_default', 'Upbeat Electronic', 'https://cdn.pixabay.com/audio/2022/03/10/audio_d89c289308.mp3', 'url', 0),
-  ('global_party_default', 'Dance Energy', 'https://cdn.pixabay.com/audio/2022/11/22/audio_3676e5c8e9.mp3', 'url', 1),
-  ('global_party_default', 'EDM Drop', 'https://cdn.pixabay.com/audio/2023/09/04/audio_de5f4a2c92.mp3', 'url', 2)
+  ('global_party_default', 'Upbeat Electronic', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3', 'url', 0),
+  ('global_party_default', 'Dance Energy', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3', 'url', 1),
+  ('global_party_default', 'EDM Drop', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3', 'url', 2),
+  ('global_party_default', 'Club Vibes', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3', 'url', 3),
+  ('global_party_default', 'Fun Times', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3', 'url', 4)
 ON CONFLICT DO NOTHING;
 
 -- Meditate mood default tracks
@@ -153,9 +159,11 @@ VALUES ('global_meditate_default', 'global', 'meditate', 'Meditation', true)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO playlist_tracks (playlist_id, track_name, track_url, source, order_index) VALUES
-  ('global_meditate_default', 'Tibetan Bowls', 'https://cdn.pixabay.com/audio/2022/02/07/audio_3c1e8b9e15.mp3', 'url', 0),
-  ('global_meditate_default', 'Zen Garden', 'https://cdn.pixabay.com/audio/2022/01/26/audio_d1718ab41b.mp3', 'url', 1),
-  ('global_meditate_default', 'Deep Breath', 'https://cdn.pixabay.com/audio/2022/03/12/audio_b4f3c4519e.mp3', 'url', 2)
+  ('global_meditate_default', 'Tibetan Bowls', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3', 'url', 0),
+  ('global_meditate_default', 'Zen Garden', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', 'url', 1),
+  ('global_meditate_default', 'Deep Breath', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', 'url', 2),
+  ('global_meditate_default', 'Mindfulness', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', 'url', 3),
+  ('global_meditate_default', 'Calm Mind', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3', 'url', 4)
 ON CONFLICT DO NOTHING;
 
 -- Deep Focus mood default tracks
@@ -164,9 +172,11 @@ VALUES ('global_deepFocus_default', 'global', 'deepFocus', 'Deep Focus', true)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO playlist_tracks (playlist_id, track_name, track_url, source, order_index) VALUES
-  ('global_deepFocus_default', 'Binaural Focus', 'https://cdn.pixabay.com/audio/2022/08/23/audio_3b8e68f90d.mp3', 'url', 0),
-  ('global_deepFocus_default', 'Concentration Mode', 'https://cdn.pixabay.com/audio/2022/05/17/audio_407815a5b6.mp3', 'url', 1),
-  ('global_deepFocus_default', 'White Noise', 'https://cdn.pixabay.com/audio/2022/03/24/audio_7a0ba7a7aa.mp3', 'url', 2)
+  ('global_deepFocus_default', 'Binaural Focus', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3', 'url', 0),
+  ('global_deepFocus_default', 'Concentration Mode', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3', 'url', 1),
+  ('global_deepFocus_default', 'White Noise', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3', 'url', 2),
+  ('global_deepFocus_default', 'Flow State', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3', 'url', 3),
+  ('global_deepFocus_default', 'Productivity', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3', 'url', 4)
 ON CONFLICT DO NOTHING;
 
 -- Nature mood default tracks
@@ -175,9 +185,11 @@ VALUES ('global_nature_default', 'global', 'nature', 'Nature Sounds', true)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO playlist_tracks (playlist_id, track_name, track_url, source, order_index) VALUES
-  ('global_nature_default', 'Forest Ambience', 'https://cdn.pixabay.com/audio/2022/08/04/audio_2dde668d05.mp3', 'url', 0),
-  ('global_nature_default', 'Birds Chirping', 'https://cdn.pixabay.com/audio/2021/09/06/audio_0917bff64a.mp3', 'url', 1),
-  ('global_nature_default', 'Waterfall', 'https://cdn.pixabay.com/audio/2022/02/17/audio_cc63d1d5ad.mp3', 'url', 2)
+  ('global_nature_default', 'Forest Ambience', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3', 'url', 0),
+  ('global_nature_default', 'Birds Chirping', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3', 'url', 1),
+  ('global_nature_default', 'Waterfall', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3', 'url', 2),
+  ('global_nature_default', 'Rain Forest', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3', 'url', 3),
+  ('global_nature_default', 'River Stream', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3', 'url', 4)
 ON CONFLICT DO NOTHING;
 
 -- ============================================

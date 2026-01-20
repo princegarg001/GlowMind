@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:glowmind/models/music_models.dart';
+import 'package:glowmind/services/freesound_service.dart';
 import 'package:glowmind/supabase/supabase_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,7 +17,7 @@ class MusicStorage {
   Future<UserMusicPreferences?> loadLocalPreferences(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       final lastMoodStr = prefs.getString(_keyLastMood);
       final lastMood = lastMoodStr != null
           ? MoodType.values.firstWhere(
@@ -50,15 +51,15 @@ class MusicStorage {
   Future<void> saveLocalPreferences(UserMusicPreferences prefs) async {
     try {
       final storage = await SharedPreferences.getInstance();
-      
+
       if (prefs.lastMood != null) {
         await storage.setString(_keyLastMood, prefs.lastMood!.name);
       }
-      
+
       if (prefs.lastTrackId != null) {
         await storage.setString(_keyLastTrackId, prefs.lastTrackId!);
       }
-      
+
       await storage.setDouble(_keyVolume, prefs.volume);
       await storage.setBool(_keyAutoPlay, prefs.autoPlay);
       await storage.setBool(_keyShuffle, prefs.shuffle);
@@ -114,7 +115,7 @@ class MusicStorage {
   Future<List<Playlist>> loadPlaylists(String userId, MoodType mood) async {
     try {
       debugPrint('MusicStorage: Loading playlists for mood: ${mood.name}');
-      
+
       // 1. Try to load user's playlists
       List<Map<String, dynamic>> data = [];
       try {
@@ -155,19 +156,75 @@ class MusicStorage {
             }
           }
         }
-        
+
         if (playlists.isNotEmpty) {
-          debugPrint('MusicStorage: Loaded ${playlists.length} playlists from Supabase');
+          debugPrint(
+              'MusicStorage: Loaded ${playlists.length} playlists from Supabase');
           return playlists;
         }
       }
 
-      // 4. Fall back to local defaults
-      debugPrint('MusicStorage: Using local default playlist');
+      // 4. Try Freesound API
+      debugPrint('MusicStorage: Trying Freesound API for mood: ${mood.name}');
+      try {
+        final freesoundPlaylist = await _loadFromFreesound(userId, mood);
+        if (freesoundPlaylist != null && freesoundPlaylist.tracks.isNotEmpty) {
+          debugPrint(
+              'MusicStorage: Loaded ${freesoundPlaylist.tracks.length} tracks from Freesound');
+          return [freesoundPlaylist];
+        }
+      } catch (e) {
+        debugPrint('MusicStorage: Freesound API failed: $e');
+      }
+
+      // 5. Fall back to hardcoded URLs (last resort)
+      debugPrint('MusicStorage: Using hardcoded fallback playlist');
       return _getLocalDefaultPlaylist(userId, mood);
     } catch (e) {
-      debugPrint('MusicStorage: loadPlaylists error: $e - falling back to local');
+      debugPrint(
+          'MusicStorage: loadPlaylists error: $e - falling back to local');
       return _getLocalDefaultPlaylist(userId, mood);
+    }
+  }
+
+  /// Load playlist from Freesound API
+  Future<Playlist?> _loadFromFreesound(String userId, MoodType mood) async {
+    try {
+      final freesoundService = FreesoundService();
+      final searchResponse =
+          await freesoundService.searchByMood(mood, pageSize: 10);
+
+      if (searchResponse.results.isNotEmpty) {
+        final tracks = searchResponse.results
+            .where((sound) => sound.bestPreviewUrl != null)
+            .map((sound) {
+          return Track(
+            id: 'freesound_${sound.id}',
+            name: sound.name,
+            url: sound.bestPreviewUrl!,
+            source: 'freesound',
+            freesoundId: sound.id,
+            durationSeconds: sound.duration.toInt(),
+            attribution: sound.attribution,
+          );
+        }).toList();
+
+        if (tracks.isNotEmpty) {
+          return Playlist(
+            id: '${userId}_${mood.name}_freesound',
+            userId: userId,
+            mood: mood,
+            name: '${mood.displayName} Mix',
+            isDefault: true,
+            tracks: tracks,
+            createdAt: DateTime.now(),
+          );
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('MusicStorage: _loadFromFreesound error: $e');
+      return null;
     }
   }
 
@@ -182,7 +239,8 @@ class MusicStorage {
       tracks: _getDefaultTracks(mood),
       createdAt: DateTime.now(),
     );
-    debugPrint('MusicStorage: Created local playlist with ${playlist.tracks.length} tracks');
+    debugPrint(
+        'MusicStorage: Created local playlist with ${playlist.tracks.length} tracks');
     return [playlist];
   }
 
@@ -238,7 +296,7 @@ class MusicStorage {
       if (result.isNotEmpty) {
         // Save tracks
         await savePlaylistTracks(playlist.id, playlist.tracks);
-        
+
         final savedPlaylist = Playlist.fromJson(result.first);
         return savedPlaylist?.copyWith(tracks: playlist.tracks);
       }
@@ -317,27 +375,45 @@ class MusicStorage {
     }
   }
 
-  /// Get default tracks for a mood (using CORS-friendly Pixabay URLs)
+  /// Get default tracks for a mood (using CORS-friendly URLs)
+  /// These are reliable streaming URLs that work for audio playback
   List<Track> _getDefaultTracks(MoodType mood) {
     switch (mood) {
       case MoodType.sleep:
         return [
           const Track(
             id: 'sleep_1',
-            name: 'Peaceful Rain',
-            url: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3',
+            name: 'Relaxing Piano',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
             source: 'url',
           ),
           const Track(
             id: 'sleep_2',
-            name: 'Soft Piano Dreams',
-            url: 'https://cdn.pixabay.com/audio/2022/02/23/audio_ea70ad08e3.mp3',
+            name: 'Peaceful Dreams',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
             source: 'url',
           ),
           const Track(
             id: 'sleep_3',
-            name: 'Ocean Lullaby',
-            url: 'https://cdn.pixabay.com/audio/2022/06/07/audio_b9bd4170e4.mp3',
+            name: 'Night Ambience',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+            source: 'url',
+          ),
+          const Track(
+            id: 'sleep_4',
+            name: 'Soft Lullaby',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+            source: 'url',
+          ),
+          const Track(
+            id: 'sleep_5',
+            name: 'Calm Night',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
             source: 'url',
           ),
         ];
@@ -345,20 +421,37 @@ class MusicStorage {
         return [
           const Track(
             id: 'study_1',
-            name: 'Lo-fi Study Beat',
-            url: 'https://cdn.pixabay.com/audio/2022/10/25/audio_946b0939c5.mp3',
+            name: 'Focus Beat',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
             source: 'url',
           ),
           const Track(
             id: 'study_2',
-            name: 'Focus Ambient',
-            url: 'https://cdn.pixabay.com/audio/2022/03/15/audio_8cb749d484.mp3',
+            name: 'Study Session',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
             source: 'url',
           ),
           const Track(
             id: 'study_3',
-            name: 'Calm Concentration',
-            url: 'https://cdn.pixabay.com/audio/2023/07/30/audio_e5e5d61a5e.mp3',
+            name: 'Concentration',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
+            source: 'url',
+          ),
+          const Track(
+            id: 'study_4',
+            name: 'Deep Work',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3',
+            source: 'url',
+          ),
+          const Track(
+            id: 'study_5',
+            name: 'Brain Power',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3',
             source: 'url',
           ),
         ];
@@ -366,20 +459,37 @@ class MusicStorage {
         return [
           const Track(
             id: 'party_1',
-            name: 'Upbeat Electronic',
-            url: 'https://cdn.pixabay.com/audio/2022/03/10/audio_d89c289308.mp3',
+            name: 'Dance Beat',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3',
             source: 'url',
           ),
           const Track(
             id: 'party_2',
-            name: 'Dance Energy',
-            url: 'https://cdn.pixabay.com/audio/2022/11/22/audio_3676e5c8e9.mp3',
+            name: 'Energy Boost',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3',
             source: 'url',
           ),
           const Track(
             id: 'party_3',
-            name: 'EDM Vibes',
-            url: 'https://cdn.pixabay.com/audio/2023/09/04/audio_de5f4a2c92.mp3',
+            name: 'Club Vibes',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3',
+            source: 'url',
+          ),
+          const Track(
+            id: 'party_4',
+            name: 'Get Moving',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3',
+            source: 'url',
+          ),
+          const Track(
+            id: 'party_5',
+            name: 'Fun Times',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3',
             source: 'url',
           ),
         ];
@@ -387,20 +497,37 @@ class MusicStorage {
         return [
           const Track(
             id: 'meditate_1',
-            name: 'Tibetan Bowls',
-            url: 'https://cdn.pixabay.com/audio/2022/02/07/audio_3c1e8b9e15.mp3',
+            name: 'Inner Peace',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3',
             source: 'url',
           ),
           const Track(
             id: 'meditate_2',
-            name: 'Zen Garden',
-            url: 'https://cdn.pixabay.com/audio/2022/01/26/audio_d1718ab41b.mp3',
+            name: 'Zen Flow',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
             source: 'url',
           ),
           const Track(
             id: 'meditate_3',
-            name: 'Deep Breathing',
-            url: 'https://cdn.pixabay.com/audio/2022/03/12/audio_b4f3c4519e.mp3',
+            name: 'Mindfulness',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+            source: 'url',
+          ),
+          const Track(
+            id: 'meditate_4',
+            name: 'Tranquility',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+            source: 'url',
+          ),
+          const Track(
+            id: 'meditate_5',
+            name: 'Calm Mind',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
             source: 'url',
           ),
         ];
@@ -408,20 +535,37 @@ class MusicStorage {
         return [
           const Track(
             id: 'focus_1',
-            name: 'Binaural Focus',
-            url: 'https://cdn.pixabay.com/audio/2022/08/23/audio_3b8e68f90d.mp3',
+            name: 'Flow State',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
             source: 'url',
           ),
           const Track(
             id: 'focus_2',
-            name: 'Concentration Mode',
-            url: 'https://cdn.pixabay.com/audio/2022/05/17/audio_407815a5b6.mp3',
+            name: 'Productivity',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
             source: 'url',
           ),
           const Track(
             id: 'focus_3',
-            name: 'Ambient Flow',
-            url: 'https://cdn.pixabay.com/audio/2022/03/24/audio_7a0ba7a7aa.mp3',
+            name: 'Deep Think',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
+            source: 'url',
+          ),
+          const Track(
+            id: 'focus_4',
+            name: 'Zone In',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
+            source: 'url',
+          ),
+          const Track(
+            id: 'focus_5',
+            name: 'Mental Clarity',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3',
             source: 'url',
           ),
         ];
@@ -429,20 +573,37 @@ class MusicStorage {
         return [
           const Track(
             id: 'nature_1',
-            name: 'Forest Ambience',
-            url: 'https://cdn.pixabay.com/audio/2022/08/04/audio_2dde668d05.mp3',
+            name: 'Forest Walk',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3',
             source: 'url',
           ),
           const Track(
             id: 'nature_2',
-            name: 'Birds Chirping',
-            url: 'https://cdn.pixabay.com/audio/2021/09/06/audio_0917bff64a.mp3',
+            name: 'River Flow',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3',
             source: 'url',
           ),
           const Track(
             id: 'nature_3',
-            name: 'Waterfall Stream',
-            url: 'https://cdn.pixabay.com/audio/2022/02/17/audio_cc63d1d5ad.mp3',
+            name: 'Bird Songs',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3',
+            source: 'url',
+          ),
+          const Track(
+            id: 'nature_4',
+            name: 'Ocean Breeze',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3',
+            source: 'url',
+          ),
+          const Track(
+            id: 'nature_5',
+            name: 'Mountain Air',
+            url:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3',
             source: 'url',
           ),
         ];
