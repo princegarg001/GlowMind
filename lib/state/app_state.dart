@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:glowmind/models/models.dart';
+import 'package:glowmind/services/audio_service.dart';
 import 'package:glowmind/services/glow_engine.dart';
 import 'package:glowmind/services/supabase_service.dart';
 import 'package:glowmind/state/music_state.dart';
@@ -100,6 +101,9 @@ class AppState extends ChangeNotifier {
   }
 
   void _onSignOut() {
+    // Stop any playing music
+    AudioService().stop();
+    
     _authStatus = AuthStatus.signedOut;
     _user = null;
     _notes = const [];
