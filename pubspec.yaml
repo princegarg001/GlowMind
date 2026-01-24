@@ -44,9 +44,10 @@ flutter:
     - assets/audio/meditate/
     - assets/audio/focus/
     - assets/audio/nature/
+    - assets/images/
 
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: assets/icons/dreamflow_icon.jpg
+  image_path: assets/images/ChatGPT_Image_Jan_24_2026_01_43_57_PM.png
   remove_alpha_ios: true
